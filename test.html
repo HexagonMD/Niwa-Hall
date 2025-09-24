@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>旅行プランナー - Trip Planner</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- サイドバー -->
+        <div class="sidebar" id="sidebar">
+            <button class="nav-button active" data-view="idea" onclick="switchView('idea')">
+                <span>💡</span>
+                <span class="tooltip">アイデアスペース</span>
+            </button>
+            <button class="nav-button" data-view="map" onclick="switchView('map')">
+                <span>📍</span>
+                <span class="tooltip">マップ</span>
+            </button>
+            <button class="nav-button" data-view="flowchart" onclick="switchView('flowchart')">
+                <span>📊</span>
+                <span class="tooltip">フローチャート</span>
+            </button>
+        </div>
+
+        <!-- メインコンテンツ -->
+        <div class="main-content">
+            <!-- ヘッダー -->
+            <div class="header">
+                <h1 style="color: #2c3e50; font-size: 24px;">🗺️ 旅行プランナー</h1>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div class="user-indicator" style="display: flex; gap: 5px;">
+                        <span
+                            style="width: 10px; height: 10px; background: #27ae60; border-radius: 50%; margin-top: 5px;"></span>
+                        <span style="color: #7f8c8d; font-size: 14px;">3人がオンライン</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ビューコンテナ -->
+            <div class="view-container">
+                <!-- アイデアスペース -->
+                <div class="view idea-space active" id="idea-view">
+                    <div class="url-import">
+                        <input type="text" placeholder="Google MapsのURLを貼り付けて自動でピンを追加..." id="urlInput">
+                        <button class="btn btn-primary" onclick="importFromURL()">インポート</button>
+                    </div>
+                    <div class="idea-board" id="ideaBoard">
+                        <div class="idea-card">
+                            <h3>🍜 ラーメン横丁</h3>
+                            <p>札幌の有名なラーメンスポット。味噌ラーメンが特におすすめ！</p>
+                            <div class="idea-tags">
+                                <span class="tag">グルメ</span>
+                                <span class="tag">1日目</span>
+                            </div>
+                        </div>
+                        <div class="idea-card">
+                            <h3>🏔️ 羊蹄山</h3>
+                            <p>北海道の富士山とも呼ばれる美しい山。写真スポットとして最高！</p>
+                            <div class="idea-tags">
+                                <span class="tag">観光</span>
+                                <span class="tag">2日目</span>
+                            </div>
+                        </div>
+                        <div class="idea-card">
+                            <h3>♨️ 登別温泉</h3>
+                            <p>地獄谷も見学できる有名な温泉地。宿泊候補地として検討中。</p>
+                            <div class="idea-tags">
+                                <span class="tag">宿泊</span>
+                                <span class="tag">温泉</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- マップビュー -->
+                <div class="view map-view" id="map-view">
+                    <div class="map-toolbar">
+                        <div class="day-tabs">
+                            <button class="day-tab active">全日程</button>
+                            <button class="day-tab">1日目</button>
+                            <button class="day-tab">2日目</button>
+                            <button class="day-tab">3日目</button>
+                        </div>
+                        <div style="flex: 1;"></div>
+                        <button class="btn btn-primary" onclick="centerMap()">現在地</button>
+                    </div>
+                    <div id="map"></div>
+                </div>
+
+                <!-- フローチャートビュー -->
+                <div class="view flowchart-view" id="flowchart-view">
+                    <div class="timeline" id="timeline">
+                        <div class="timeline-item" draggable="true">
+                            <div class="time-display">09:00</div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">札幌駅集合</div>
+                                <div class="timeline-duration">所要時間: 30分</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item" draggable="true">
+                            <div class="time-display">09:30</div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">大通公園散策</div>
+                                <div class="timeline-duration">所要時間: 1時間</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item" draggable="true">
+                            <div class="time-display">10:30</div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">札幌時計台見学</div>
+                                <div class="timeline-duration">所要時間: 45分</div>
+                            </div>
+                        </div>
+                        <div class="timeline-item" draggable="true">
+                            <div class="time-display">11:15</div>
+                            <div class="timeline-content">
+                                <div class="timeline-title">ラーメン横丁でランチ</div>
+                                <div class="timeline-duration">所要時間: 1時間30分</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 追加ボタン -->
+    <button class="fab" onclick="openModal()">+</button>
+
+    <!-- モーダル -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>新しいアイテムを追加</h2>
+            </div>
+            <form id="addForm">
+                <div class="form-group">
+                    <label>タイトル</label>
+                    <input type="text" id="itemTitle" placeholder="例: おいしいラーメン屋">
+                </div>
+                <div class="form-group">
+                    <label>説明</label>
+                    <textarea id="itemDescription" placeholder="詳細な説明を入力..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>URL</label>
+                    <input type="url" id="itemUrl" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>ピンの種類</label>
+                    <div class="pin-types">
+                        <div class="pin-type">
+                            <input type="radio" name="pinType" value="food" id="food" checked>
+                            <label for="food"><span class="pin-type-color" style="background: #e74c3c;"></span>
+                                グルメ</label>
+                        </div>
+                        <div class="pin-type">
+                            <input type="radio" name="pinType" value="sightseeing" id="sightseeing">
+                            <label for="sightseeing"><span class="pin-type-color" style="background: #3498db;"></span>
+                                観光</label>
+                        </div>
+                        <div class="pin-type">
+                            <input type="radio" name="pinType" value="hotel" id="hotel">
+                            <label for="hotel"><span class="pin-type-color" style="background: #27ae60;"></span>
+                                宿泊</label>
+                        </div>
+                        <div class="pin-type">
+                            <input type="radio" name="pinType" value="transport" id="transport">
+                            <label for="transport"><span class="pin-type-color" style="background: #f39c12;"></span>
+                                交通</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>日程</label>
+                    <select id="itemDay">
+                        <option value="0">未定</option>
+                        <option value="1">1日目</option>
+                        <option value="2">2日目</option>
+                        <option value="3">3日目</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">追加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
