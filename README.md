@@ -7,23 +7,25 @@
 セットアップ手順
 
 1. Google Maps API キーを取得する
+
    - Google Cloud Console にログインし、プロジェクトを作成します。
    - 「APIs & Services」→「Credentials」から API キーを作成します。
    - 必要に応じて「Maps JavaScript API」と「Places API」を有効にしてください。
    - 制限はデモ用途なら HTTP リファラー制限（localhost）を設定すると安全です。
 
 2. `test.html` を開いて API キーを渡す方法
-   - 方法A（推奨・一時的）: ブラウザで URL のハッシュにキーを付ける
+
+   - 方法 A（推奨・一時的）: ブラウザで URL のハッシュにキーを付ける
      - 例: `file:///C:/path/to/test.html#key=YOUR_API_KEY`
-   - 方法B（対話式）: ページを開くとプロンプトでキーを入力できます（セッションに保存されます）。
+   - 方法 B（対話式）: ページを開くとプロンプトでキーを入力できます（セッションに保存されます）。
 
 3. ローカルで開発する際の注意
-   - 直接 `file://` で開くと一部のブラウザで制限（CORSやスクリプト読み込み）があります。簡単なサーバーで提供することを推奨します。
+   - 直接 `file://` で開くと一部のブラウザで制限（CORS やスクリプト読み込み）があります。簡単なサーバーで提供することを推奨します。
    - PowerShell で簡単に立ち上げるコマンド例:
 
 ```powershell
 # PowerShell (Windows)
-cd 'C:\Users\jinnosuke\Documents\src\HackU\googlemap_test'
+cd 'C:\Users\{ユーザー名}\Documents\src\HackU\googlemap_test'
 python -m http.server 8000
 # または
 npx http-server -p 8000
