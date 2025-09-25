@@ -12,12 +12,30 @@ class WebRTCManager {
     this.eventListeners = new Map(); // イベントリスナー管理
     this.users = {}; // 接続ユーザー管理
 
-    // WebRTC設定
+    // WebRTC設定（STUN + TURN）
     this.rtcConfig = {
       iceServers: [
         { urls: "stun:stun.l.google.com:19302" },
         { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun.cloudflare.com:3478" },
+        // TURNサーバー（NAT越え用中継）
+        {
+          urls: "turn:openrelay.metered.ca:80",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+        {
+          urls: "turn:openrelay.metered.ca:443",
+          username: "openrelayproject",
+          credential: "openrelayproject",
+        },
+        {
+          urls: "turn:turn.bistri.com:80",
+          credential: "homeo",
+          username: "homeo",
+        },
       ],
+      iceCandidatePoolSize: 10, // ICE候補プール拡張
     };
   }
 
@@ -286,6 +304,25 @@ class WebRTCManager {
     peer.ondatachannel = (event) => {
       console.log(`📨 データチャンネル受信 from ${remoteUserId}`);
       this.setupDataChannel(event.channel, remoteUserId);
+    };
+
+    // ICE接続状態監視
+    peer.oniceconnectionstatechange = () => {
+      console.log(`🧊 ICE接続状態変更 ${remoteUserId}: ${peer.iceConnectionState}`);
+
+      if (peer.iceConnectionState === "connected" || peer.iceConnectionState === "completed") {
+        console.log(`✅ ICE接続成功: ${remoteUserId} (${peer.iceConnectionState})`);
+      } else if (peer.iceConnectionState === "failed") {
+        console.log(`❌ ICE接続失敗: ${remoteUserId} - TURNサーバー経由を試行中...`);
+      } else if (peer.iceConnectionState === "disconnected") {
+        console.log(`🔌 ICE切断: ${remoteUserId}`);
+        setTimeout(() => {
+          if (peer.iceConnectionState === "disconnected") {
+            console.log(`🔄 ICE再接続試行: ${remoteUserId}`);
+            this.restartIce(peer, remoteUserId);
+          }
+        }, 3000);
+      }
     };
 
     // 接続状態監視
@@ -706,5 +743,23 @@ class WebRTCManager {
       console.log("📭 接続中のピアがありません");
     }
     console.log("====================\n");
+  }
+
+  // ICE再起動（接続失敗時の復旧）
+  restartIce(peer, userId) {
+    if (peer && peer.connectionState !== "closed") {
+      console.log(`🔄 ICE再起動実行: ${userId}`);
+      try {
+        peer.restartIce();
+      } catch (error) {
+        console.error(`❌ ICE再起動失敗: ${userId}`, error);
+        // ICE再起動に失敗した場合は接続をリセット
+        this.closePeerConnection(userId);
+        setTimeout(() => {
+          console.log(`🔄 接続完全リセット: ${userId}`);
+          this.createPeerConnection(userId);
+        }, 2000);
+      }
+    }
   }
 }
