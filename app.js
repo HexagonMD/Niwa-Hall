@@ -258,6 +258,43 @@ function updateUserList() {
   }
 }
 
+// 旅行データ同期関数（新規ユーザー入室時の既存データ表示用）
+function syncTripData(tripData) {
+  console.log("🔄 tripData同期開始:", tripData);
+
+  if (!tripData) {
+    console.warn("⚠️ tripDataが空です");
+    return;
+  }
+
+  // 既存のアイデアを表示
+  if (tripData.ideas && Array.isArray(tripData.ideas)) {
+    console.log(`📝 ${tripData.ideas.length}個のアイデアを同期中...`);
+
+    tripData.ideas.forEach((idea, index) => {
+      console.log(`📝 アイデア${index + 1}を表示:`, idea);
+      // fromRemote = true で追加（WebRTC送信をスキップ）
+      addIdeaCard(idea.title, idea.description, idea.type, idea.day, true);
+    });
+
+    console.log("✅ 全てのアイデア同期完了");
+  }
+
+  // 必要に応じて他のデータも同期（ピン、タイムラインなど）
+  if (tripData.pins) {
+    console.log(`📍 ${tripData.pins.length}個のピンを同期中...`);
+    // ピン同期処理は将来実装
+  }
+
+  if (tripData.timeline) {
+    console.log("📅 タイムラインを同期中...");
+    // タイムライン同期処理は将来実装
+  }
+}
+
+// グローバルからアクセス可能にする
+window.syncTripData = syncTripData;
+
 // アイデアカードの追加（WebRTC対応版）
 function addIdeaCard(title, description, type, day, fromRemote = false) {
   console.log("🎯 addIdeaCard呼び出し:", { title, description, type, day, fromRemote });
