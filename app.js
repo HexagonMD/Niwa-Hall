@@ -4,12 +4,319 @@ let appState = {
   pins: [],
   ideas: [],
   timeline: [],
-  users: [
-    { id: 1, name: "User1", color: "#3498db", x: 0, y: 0 },
-    { id: 2, name: "User2", color: "#e74c3c", x: 0, y: 0 },
-    { id: 3, name: "User3", color: "#27ae60", x: 0, y: 0 },
-  ],
+  users: [],
+  isHost: false,
+  roomId: null,
 };
+
+// WebRTC Collaboration
+let collaborationEnabled = false;
+let currentUser = {
+  id: "user_" + Date.now(),
+  name: "ユーザー" + Math.floor(Math.random() * 100),
+  color: "#" + Math.floor(Math.random() * 16777215).toString(16),
+};
+
+// WebRTC Manager初期化
+async function initWebRTC() {
+  try {
+    console.log("🔄 WebRTC初期化開始...");
+
+    // WebRTCManagerインスタンス作成
+    if (!window.webRTCManager) {
+      if (typeof WebRTCManager === "undefined") {
+        console.error("❌ WebRTCManagerクラスが見つかりません");
+        showNotification("WebRTCManagerの読み込みに失敗しました", "error");
+        return;
+      }
+      window.webRTCManager = new WebRTCManager();
+    }
+
+    // 初期化
+    await window.webRTCManager.init();
+    window.webRTCManager.isInitialized = true;
+
+    console.log("✅ WebRTC初期化完了");
+    showNotification("協働機能が利用可能になりました", "success");
+
+    // WebRTCイベントリスナー
+    window.webRTCManager.on("ideaReceived", (data) => {
+      console.log("🎉 アイデア受信イベント発火:", data);
+      console.log("📥 受信したデータ:", JSON.stringify(data, null, 2));
+      addIdeaCard(data.title, data.description, data.type, data.day, true);
+      console.log("✅ 受信アイデアを画面に追加完了");
+    });
+
+    window.webRTCManager.on("markerReceived", (data) => {
+      console.log("📍 マーカー受信:", data);
+      addMapMarker(data.lat, data.lng, data.title, true);
+    });
+
+    window.webRTCManager.on("timelineReceived", (data) => {
+      console.log("📊 タイムライン受信:", data);
+      addTimelineItem(data.title, data.time, data.day, true);
+    });
+
+    window.webRTCManager.on("userJoined", (user) => {
+      showNotification(`${user.name}さんが参加しました`, "success");
+      updateUserList();
+    });
+
+    window.webRTCManager.on("userLeft", (userId) => {
+      showNotification("ユーザーが退室しました", "info");
+      updateUserList();
+    });
+
+    window.webRTCManager.on("roomJoined", (roomId) => {
+      collaborationEnabled = true;
+      appState.roomId = roomId;
+      console.log("🎯 ルーム参加完了、協働機能有効化:", { roomId, collaborationEnabled });
+      updateUserList();
+      showNotification("協働機能が有効になりました！", "success");
+    });
+
+    window.webRTCManager.on("roomLeft", () => {
+      collaborationEnabled = false;
+      appState.roomId = null;
+      updateUserList();
+    });
+  } catch (error) {
+    console.error("❌ WebRTC初期化エラー:", error);
+    showNotification("WebRTC初期化に失敗しました: " + error.message, "error");
+  }
+}
+
+// WebRTC協調機能
+function showNotification(message, type = "info") {
+  const notification = document.createElement("div");
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${type === "success" ? "#4CAF50" : type === "error" ? "#f44336" : "#2196F3"};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 4px;
+        z-index: 10000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    `;
+  document.body.appendChild(notification);
+
+  setTimeout(() => {
+    notification.remove();
+  }, 3000);
+}
+
+// 協働セッションを開始
+function startCollaboration() {
+  console.log("🎯 協働開始ボタンがクリックされました");
+  console.log("WebRTCManager存在:", !!window.webRTCManager);
+  console.log("初期化状態:", window.webRTCManager?.isInitialized);
+  console.log("接続状態:", window.webRTCManager?.isConnected);
+
+  if (window.webRTCManager && window.webRTCManager.isInitialized) {
+    const roomId = prompt("ルームIDを入力してください（新しいルームの場合は空白）:");
+    if (roomId !== null) {
+      const finalRoomId = roomId.trim() || "room_" + Date.now();
+      console.log("🚪 ルームに参加します:", finalRoomId);
+      window.webRTCManager.joinRoom(finalRoomId);
+    }
+  } else {
+    console.log("❌ WebRTC未初期化、再初期化を試行");
+    showNotification("WebRTC機能の初期化中です。しばらく待ってから再試行してください。", "error");
+
+    // 強制的に初期化を再試行
+    initWebRTC()
+      .then(() => {
+        console.log("✅ 再初期化完了");
+        showNotification("初期化完了！もう一度お試しください。", "success");
+      })
+      .catch((error) => {
+        console.error("❌ 再初期化失敗:", error);
+        showNotification("初期化に失敗しました: " + error.message, "error");
+      });
+  }
+}
+
+// 協働セッションから退出
+function leaveCollaboration() {
+  if (window.webRTCManager && appState.roomId) {
+    window.webRTCManager.leaveRoom();
+    appState.roomId = null;
+    collaborationEnabled = false;
+    showNotification("協働セッションから退出しました", "info");
+  }
+}
+
+// デバッグ: 協働状態確認
+function debugCollaboration() {
+  console.log("🔍 協働状態デバッグ:");
+  console.log("collaborationEnabled:", collaborationEnabled);
+  console.log("appState.roomId:", appState.roomId);
+  console.log("webRTCManager存在:", !!window.webRTCManager);
+  if (window.webRTCManager) {
+    console.log("WebRTCManager詳細:", {
+      initialized: window.webRTCManager.isInitialized,
+      connected: window.webRTCManager.isConnected,
+      roomId: window.webRTCManager.roomId,
+      peers: window.webRTCManager.peerConnections?.size,
+      dataChannels: window.webRTCManager.dataChannels?.size,
+    });
+
+    // WebRTCManagerの詳細デバッグ
+    window.webRTCManager.debugConnections();
+  }
+}
+
+// WebRTC接続強制リセット（デバッグ用）
+function resetWebRTCConnection(userId) {
+  if (window.webRTCManager && userId) {
+    window.webRTCManager.forceResetConnection(userId);
+  } else {
+    console.log("❌ WebRTCManagerまたはuserIdが無効");
+  }
+}
+
+// データチャンネル強制作成（デバッグ用）
+function createDataChannel(userId) {
+  if (window.webRTCManager && userId) {
+    window.webRTCManager.forceCreateDataChannel(userId);
+  } else {
+    console.log("❌ WebRTCManagerまたはuserIdが無効");
+  }
+}
+
+// テスト用: 強制的にアイデアを送信
+function testSendIdea() {
+  const testIdea = {
+    title: "テストアイデア",
+    description: "これは同期テストです",
+    type: "food",
+    day: "1",
+    id: Date.now(),
+  };
+
+  console.log("🧪 テストアイデア送信:", testIdea);
+
+  if (window.webRTCManager && window.webRTCManager.sendIdea) {
+    window.webRTCManager.sendIdea(testIdea);
+    console.log("✅ 送信完了");
+  } else {
+    console.log("❌ WebRTCManager.sendIdea が利用できません");
+  }
+}
+
+// テスト用: 協働機能を強制有効化
+function forceEnableCollaboration() {
+  collaborationEnabled = true;
+  console.log("🔥 協働機能を強制有効化しました");
+  console.log("現在の状態:", {
+    collaborationEnabled,
+    webRTCManager: !!window.webRTCManager,
+    roomId: appState.roomId,
+  });
+}
+
+// グローバルからアクセス可能にする
+window.debugCollaboration = debugCollaboration;
+window.testSendIdea = testSendIdea;
+window.forceEnableCollaboration = forceEnableCollaboration;
+
+function updateUserList() {
+  // ユーザーリスト更新処理
+  if (window.webRTCManager && window.webRTCManager.users) {
+    const userCount = Object.keys(window.webRTCManager.users).length + 1;
+    const userCountElement = document.getElementById("userCount");
+    const statusIndicator = document.getElementById("statusIndicator");
+    const collaborationBtn = document.getElementById("collaborationBtn");
+    const leaveBtn = document.getElementById("leaveBtn");
+
+    if (userCountElement) {
+      userCountElement.textContent = `${userCount}人がオンライン`;
+    }
+
+    if (statusIndicator) {
+      statusIndicator.style.background = collaborationEnabled ? "#27ae60" : "#e74c3c";
+    }
+
+    if (collaborationBtn && leaveBtn) {
+      if (collaborationEnabled && appState.roomId) {
+        collaborationBtn.style.display = "none";
+        leaveBtn.style.display = "inline-block";
+      } else {
+        collaborationBtn.style.display = "inline-block";
+        leaveBtn.style.display = "none";
+      }
+    }
+
+    console.log(`現在の参加者数: ${userCount}人`);
+  }
+}
+
+// アイデアカードの追加（WebRTC対応版）
+function addIdeaCard(title, description, type, day, fromRemote = false) {
+  console.log("🎯 addIdeaCard呼び出し:", { title, description, type, day, fromRemote });
+
+  const ideaBoard = document.getElementById("ideaBoard");
+  if (!ideaBoard) {
+    console.error("❌ ideaBoard要素が見つかりません");
+    return;
+  }
+
+  const card = document.createElement("div");
+  card.className = "idea-card";
+
+  const typeEmoji = { food: "🍜", sightseeing: "🏔️", hotel: "🏨", transport: "🚗" };
+  const typeLabel = { food: "グルメ", sightseeing: "観光", hotel: "宿泊", transport: "交通" };
+
+  const ideaData = { title, description, type, day, id: Date.now() };
+  appState.ideas.push(ideaData);
+
+  card.innerHTML = `
+        <h3>${typeEmoji[type]} ${title}</h3>
+        <p>${description}</p>
+        <div class="idea-tags">
+            <span class="tag">${typeLabel[type]}</span>
+            ${day !== "0" ? `<span class="tag">${day}日目</span>` : ""}
+        </div>
+    `;
+
+  ideaBoard.appendChild(card);
+  console.log("✅ アイデアカードを画面に追加しました");
+
+  // WebRTC同期の詳細チェック
+  console.log("🔍 WebRTC同期チェック開始");
+  console.log("- fromRemote:", fromRemote);
+  console.log("- collaborationEnabled:", collaborationEnabled);
+  console.log("- window.webRTCManager:", !!window.webRTCManager);
+
+  if (!fromRemote && collaborationEnabled && window.webRTCManager) {
+    console.log("📤 WebRTC送信開始:", ideaData);
+    console.log("WebRTCManager詳細状態:", {
+      initialized: window.webRTCManager.isInitialized,
+      connected: window.webRTCManager.isConnected,
+      roomId: window.webRTCManager.roomId,
+      dataChannels: window.webRTCManager.dataChannels?.size,
+      sendIdeaExists: typeof window.webRTCManager.sendIdea === "function",
+    });
+
+    try {
+      window.webRTCManager.sendIdea(ideaData);
+      console.log("✅ WebRTC送信完了");
+    } catch (error) {
+      console.error("❌ WebRTC送信エラー:", error);
+    }
+  } else {
+    console.log("❌ WebRTC送信スキップ理由:", {
+      fromRemote: fromRemote,
+      collaborationEnabled: collaborationEnabled,
+      webRTCManagerExists: !!window.webRTCManager,
+      condition: `!${fromRemote} && ${collaborationEnabled} && ${!!window.webRTCManager}`,
+    });
+  }
+}
 
 // ビュー切り替え
 function switchView(viewName) {
@@ -61,26 +368,7 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
   closeModal();
 });
 
-// アイデアカードの追加
-function addIdeaCard(title, description, type, day) {
-  const ideaBoard = document.getElementById("ideaBoard");
-  const card = document.createElement("div");
-  card.className = "idea-card";
-
-  const typeEmoji = { food: "🍜", sightseeing: "🏔️", hotel: "🏨", transport: "🚗" };
-  const typeLabel = { food: "グルメ", sightseeing: "観光", hotel: "宿泊", transport: "交通" };
-
-  card.innerHTML = `
-        <h3>${typeEmoji[type]} ${title}</h3>
-        <p>${description}</p>
-        <div class="idea-tags">
-            <span class="tag">${typeLabel[type]}</span>
-            ${day !== "0" ? `<span class="tag">${day}日目</span>` : ""}
-        </div>
-    `;
-
-  ideaBoard.appendChild(card);
-}
+// 重複している関数を削除（WebRTC対応版が上で定義されている）
 
 // URLからのインポート処理
 function importFromURL() {
@@ -238,7 +526,7 @@ async function initMap() {
   });
 }
 
-function addMarker(pinData, center = false) {
+function addMarker(pinData, center = false, fromRemote = false) {
   if (!map) return;
   const position = { lat: Number(pinData.lat), lng: Number(pinData.lng) };
   const marker = new google.maps.Marker({
@@ -253,7 +541,20 @@ function addMarker(pinData, center = false) {
   });
   marker.addListener("click", () => info.open(map, marker));
   mapMarkers.push(marker);
-  appState.pins.push(pinData);
+
+  const markerData = {
+    lat: Number(pinData.lat),
+    lng: Number(pinData.lng),
+    title: pinData.title || pinData.name || "場所",
+    id: pinData.id || Date.now(),
+  };
+  appState.pins.push(markerData);
+
+  // WebRTC同期（リモートからの変更でなければ送信）
+  if (!fromRemote && collaborationEnabled && window.webRTCManager) {
+    window.webRTCManager.sendMarker(markerData);
+  }
+
   if (center) map.panTo(position);
 }
 
@@ -444,6 +745,12 @@ document.addEventListener("DOMContentLoaded", function () {
   });
   simulateCollaboration();
   new CollaborationManager();
+
+  // WebRTC初期化
+  setTimeout(() => {
+    initWebRTC();
+    showNotification("協働機能を初期化中...", "info");
+  }, 1000);
 });
 
 function filterPinsByDay(day) {
@@ -514,17 +821,52 @@ function refreshUI() {
   });
 }
 
-function addTimelineItem(item) {
+function addTimelineItem(item, fromRemote = false) {
+  // itemがオブジェクトでない場合（旧形式）の処理
+  let timelineData;
+  if (typeof item === "string") {
+    // 旧形式: addTimelineItem(title, time, day, fromRemote)
+    timelineData = {
+      title: arguments[0],
+      time: arguments[1] || "00:00",
+      day: arguments[2] || "1",
+      duration: "1時間",
+      id: Date.now(),
+    };
+    fromRemote = arguments[3] || false;
+  } else {
+    // 新形式: オブジェクト
+    timelineData = {
+      ...item,
+      id: item.id || Date.now(),
+    };
+  }
+
   const timeline = document.getElementById("timeline");
   const timelineItem = document.createElement("div");
   timelineItem.className = "timeline-item";
   timelineItem.draggable = true;
-  timelineItem.innerHTML = `\n                <div class="time-display">${item.time}</div>\n                <div class="timeline-content">\n                    <div class="timeline-title">${item.title}</div>\n                    <div class="timeline-duration">所要時間: ${item.duration}</div>\n                </div>\n            `;
+  timelineItem.innerHTML = `
+    <div class="time-display">${timelineData.time}</div>
+    <div class="timeline-content">
+      <div class="timeline-title">${timelineData.title}</div>
+      <div class="timeline-duration">所要時間: ${timelineData.duration}</div>
+    </div>
+  `;
+
   timelineItem.addEventListener("dragstart", handleDragStart);
   timelineItem.addEventListener("dragover", handleDragOver);
   timelineItem.addEventListener("drop", handleDrop);
   timelineItem.addEventListener("dragend", handleDragEnd);
   timeline.appendChild(timelineItem);
+
+  // appStateに追加
+  appState.timeline.push(timelineData);
+
+  // WebRTC同期（リモートからの変更でなければ送信）
+  if (!fromRemote && collaborationEnabled && window.webRTCManager) {
+    window.webRTCManager.sendTimeline(timelineData);
+  }
 }
 
 // キーボードショートカット
