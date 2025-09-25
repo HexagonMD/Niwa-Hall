@@ -227,7 +227,10 @@ window.forceEnableCollaboration = forceEnableCollaboration;
 function updateUserList() {
   // ユーザーリスト更新処理
   if (window.webRTCManager && window.webRTCManager.users) {
-    const userCount = Object.keys(window.webRTCManager.users).length + 1;
+    // usersが配列の場合は length、オブジェクトの場合は Object.keys().length を使用
+    const userCount = Array.isArray(window.webRTCManager.users)
+      ? window.webRTCManager.users.length
+      : Object.keys(window.webRTCManager.users).length;
     const userCountElement = document.getElementById("userCount");
     const statusIndicator = document.getElementById("statusIndicator");
     const collaborationBtn = document.getElementById("collaborationBtn");

@@ -99,6 +99,20 @@ io.on("connection", (socket) => {
     console.log(`User ${userName} (${userId}) joined room ${roomId}`);
   });
 
+  // ルーム状態要求
+  socket.on("get-room-state", (data) => {
+    const { roomId } = data;
+    const room = rooms[roomId];
+
+    if (room) {
+      socket.emit("room-state", {
+        users: room.getUserList(),
+        tripData: room.tripData,
+      });
+      console.log(`Room state sent to ${currentUserId} for room ${roomId}`);
+    }
+  });
+
   // WebRTC シグナリング: オファー送信
   socket.on("webrtc-offer", (data) => {
     const { targetUserId, offer } = data;

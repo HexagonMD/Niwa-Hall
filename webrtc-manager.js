@@ -10,7 +10,7 @@ class WebRTCManager {
     this.isConnected = false;
     this.isInitialized = false;
     this.eventListeners = new Map(); // イベントリスナー管理
-    this.users = {}; // 接続ユーザー管理
+    this.users = []; // 接続ユーザー管理（配列）
 
     // WebRTC設定（STUN + TURN）
     this.rtcConfig = {
@@ -203,6 +203,14 @@ class WebRTCManager {
       userId: this.userId,
       userName,
     });
+
+    // ルーム参加後、少し待ってからユーザーリストを要求
+    setTimeout(() => {
+      if (this.socket && this.roomId) {
+        this.socket.emit("get-room-state", { roomId });
+        console.log("🔄 ユーザーリスト更新を要求しました");
+      }
+    }, 1000);
 
     // ルーム参加イベントを発火
     this.emit("roomJoined", roomId);
@@ -616,12 +624,12 @@ class WebRTCManager {
 
   // UI更新メソッド（app.jsから呼び出される）
   updateUserList(users) {
-    // ユーザー一覧を内部で管理
-    this.users = users || {};
+    // ユーザー一覧を内部で管理（配列またはオブジェクト）
+    this.users = users || [];
 
     // UIの更新イベントを発火
-    if (window.updateCollaborators) {
-      window.updateCollaborators(users);
+    if (window.updateUserList) {
+      window.updateUserList();
     }
   }
 
