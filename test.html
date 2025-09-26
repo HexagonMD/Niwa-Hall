@@ -32,10 +32,16 @@
             <div class="header">
                 <h1 style="color: #2c3e50; font-size: 24px;">🗺️ 旅行プランナー</h1>
                 <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="btn btn-secondary" onclick="startCollaboration()" id="collaborationBtn">
+                        🤝 協働開始
+                    </button>
+                    <button class="btn btn-outline" onclick="leaveCollaboration()" id="leaveBtn" style="display: none;">
+                        🚪 退出
+                    </button>
                     <div class="user-indicator" style="display: flex; gap: 5px;">
-                        <span
-                            style="width: 10px; height: 10px; background: #27ae60; border-radius: 50%; margin-top: 5px;"></span>
-                        <span style="color: #7f8c8d; font-size: 14px;">3人がオンライン</span>
+                        <span id="statusIndicator"
+                            style="width: 10px; height: 10px; background: #e74c3c; border-radius: 50%; margin-top: 5px;"></span>
+                        <span style="color: #7f8c8d; font-size: 14px;" id="userCount">オフライン</span>
                     </div>
                 </div>
             </div>
@@ -192,6 +198,11 @@
         </div>
     </div>
 
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <!-- WebRTC Manager -->
+    <script src="webrtc-manager.js"></script>
+    <!-- Main Application -->
     <script src="app.js"></script>
 </body>
 
