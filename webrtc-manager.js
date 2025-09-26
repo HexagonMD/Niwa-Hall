@@ -11,6 +11,9 @@ class WebRTCManager {
     this.isInitialized = false;
     this.eventListeners = new Map(); // イベントリスナー管理
     this.users = []; // 接続ユーザー管理（配列）
+    this.iceCandidateQueue = new Map(); // userId -> RTCIceCandidate[]
+    this.processingOffers = new Set(); // 再入防止用
+    this.processingAnswers = new Set(); // 再入防止用
 
     // WebRTC設定（STUN + TURN）
     this.rtcConfig = {
@@ -105,15 +108,10 @@ class WebRTCManager {
     this.socket.on("user-joined", (data) => {
       console.log(`👋 User joined: ${data.userName} (${data.userId})`);
 
-      // 自分自身とは接続しない
-      if (data.userId !== this.userId) {
-        // 少し遅延してから接続を作成（競合状態を防ぐ）
-        setTimeout(() => {
-          this.createPeerConnection(data.userId);
-        }, Math.random() * 1000); // 0-1秒のランダム遅延
-      } else {
-        console.log(`ℹ️ 自分自身なので接続をスキップ: ${data.userId}`);
-      }
+      // 既存のユーザーは、新しく参加したユーザーからの接続を待つため、
+      // ここで自らピア接続を開始する必要はありません。
+      // 新規参加者が 'room-state' を受信した際に、既存の全ユーザーへの接続を開始します。
+      // これにより、両者が同時に接続を開始しようとする競合状態（グレア）を防ぎます。
 
       this.updateUserList(data.users);
       this.emit("userJoined", { id: data.userId, name: data.userName });
@@ -175,15 +173,15 @@ class WebRTCManager {
 
     // Socket.IO経由のデータ同期（WebRTC接続前のフォールバック）
     this.socket.on("idea-added", (data) => {
-      this.handleRemoteIdeaAdded(data.idea, data.fromUserId);
+      // フォールバックは削除されたため、このイベントは使用されない
     });
 
     this.socket.on("marker-added", (data) => {
-      this.handleRemoteMarkerAdded(data.marker, data.fromUserId);
+      // フォールバックは削除されたため、このイベントは使用されない
     });
 
     this.socket.on("timeline-updated", (data) => {
-      this.handleRemoteTimelineUpdated(data.timeline, data.fromUserId);
+      // フォールバックは削除されたため、このイベントは使用されない
     });
   }
 
@@ -291,6 +289,7 @@ class WebRTCManager {
     console.log(`🆕 新しいピア接続作成: ${remoteUserId}`);
     const peer = new RTCPeerConnection(this.rtcConfig);
     this.peerConnections.set(remoteUserId, peer);
+    this.iceCandidateQueue.set(remoteUserId, []); // ICE候補キューを初期化
 
     // データチャンネル作成 (offerする側のみ)
     const dataChannel = peer.createDataChannel("tripData", {
@@ -425,12 +424,21 @@ class WebRTCManager {
   async handleOffer(fromUserId, offer) {
     console.log(`📡 Offer受信 from ${fromUserId}`);
 
+    // 既に処理中ならスキップ（再入防止）
+    if (this.processingOffers.has(fromUserId)) {
+      console.log(`⏭️ Offer処理中のためスキップ: ${fromUserId}`);
+      return;
+    }
+    this.processingOffers.add(fromUserId);
+
     let peer = this.peerConnections.get(fromUserId);
     if (!peer) {
       console.log(`🔗 新しいピア接続作成 for ${fromUserId}`);
       peer = new RTCPeerConnection(this.rtcConfig);
       this.peerConnections.set(fromUserId, peer);
+      this.iceCandidateQueue.set(fromUserId, []); // ICE候補キューを初期化
 
+      // 必要なイベントリスナーを設定
       peer.onicecandidate = (event) => {
         if (event.candidate) {
           this.socket.emit("webrtc-ice-candidate", {
@@ -441,32 +449,61 @@ class WebRTCManager {
       };
 
       peer.ondatachannel = (event) => {
+        console.log(`📨 データチャンネル受信 from ${fromUserId}`);
         this.setupDataChannel(event.channel, fromUserId);
       };
 
+      peer.oniceconnectionstatechange = () => {
+        console.log(`🧊 (answer側) ICE接続状態変更 ${fromUserId}: ${peer.iceConnectionState}`);
+      };
+
       peer.onconnectionstatechange = () => {
-        console.log(`🔄 接続状態変更 ${fromUserId}: ${peer.connectionState}`);
+        console.log(`🔗 (answer側) 接続状態変更 ${fromUserId}: ${peer.connectionState}`);
       };
     }
 
     try {
       console.log(`📡 現在の状態: ${peer.signalingState}`);
 
-      // 既に接続が完了している場合はスキップ
-      if (peer.signalingState === "stable") {
-        console.log(`ℹ️ 接続済み (stable状態) - offerをスキップ: ${fromUserId}`);
+      // 既にクローズ済みなら何もしない
+      if (peer.signalingState === "closed") {
+        console.warn(`⚠️ ピアがclosedのためofferを処理できません: ${fromUserId}`);
         return;
       }
 
-      // 既にremote descriptionが設定されている場合もスキップ
-      if (peer.remoteDescription) {
-        console.warn(`⚠️ 既にremote descriptionが設定済み、offerをスキップ: ${fromUserId}`);
+      // 重複オファー（同一SDP）を無視
+      if (peer.remoteDescription && this._isSameDescription(peer.remoteDescription, offer)) {
+        console.log(`ℹ️ 同一SDPのofferを受信、スキップ: ${fromUserId}`);
+        return;
+      }
+
+      // 自分が既にローカルオファーを持っている場合は競合回避のためスキップ（簡易ガード）
+      if (peer.signalingState === "have-local-offer") {
+        console.log(`ℹ️ have-local-offer中にoffer受信、二重処理を回避してスキップ: ${fromUserId}`);
+        return;
+      }
+
+      // stable は既に応答済みなのでスキップ
+      if (peer.signalingState === "stable" && peer.remoteDescription) {
+        console.log(`ℹ️ stable状態でoffer受信、スキップ: ${fromUserId}`);
         return;
       }
 
       await peer.setRemoteDescription(offer);
       const answer = await peer.createAnswer();
+
+      // setLocalDescription 前に状態を再チェック（他スレッドで処理済みの可能性）
+      if (peer.signalingState !== "have-remote-offer") {
+        console.log(
+          `ℹ️ setLocalDescription前に状態変化 (${peer.signalingState}) のためスキップ: ${fromUserId}`
+        );
+        return;
+      }
+
       await peer.setLocalDescription(answer);
+
+      // RemoteDescription 設定後にキュー済みICE候補を反映
+      await this.processIceCandidateQueue(fromUserId);
 
       console.log(`📤 Answer送信 to ${fromUserId}`);
       this.socket.emit("webrtc-answer", {
@@ -475,6 +512,8 @@ class WebRTCManager {
       });
     } catch (error) {
       console.error("Failed to handle offer:", error);
+    } finally {
+      this.processingOffers.delete(fromUserId);
     }
   }
 
@@ -484,9 +523,30 @@ class WebRTCManager {
       try {
         console.log(`📡 Answer受信 from ${fromUserId}, 現在の状態:`, peer.signalingState);
 
+        // 既に処理中ならスキップ（再入防止）
+        if (this.processingAnswers.has(fromUserId)) {
+          console.log(`⏭️ Answer処理中のためスキップ: ${fromUserId}`);
+          return;
+        }
+        this.processingAnswers.add(fromUserId);
+
+        // クローズ済みは無視
+        if (peer.signalingState === "closed") {
+          console.warn(`⚠️ ピアがclosedのためanswerを処理できません: ${fromUserId}`);
+          return;
+        }
+
+        // 重複アンサー（同一SDP）を無視
+        if (peer.remoteDescription && this._isSameDescription(peer.remoteDescription, answer)) {
+          console.log(`ℹ️ 同一SDPのanswerを受信、スキップ: ${fromUserId}`);
+          return;
+        }
+
         // 正しい状態でのみsetRemoteDescriptionを実行
         if (peer.signalingState === "have-local-offer") {
           await peer.setRemoteDescription(answer);
+          // キューに入れられたICE候補を処理
+          await this.processIceCandidateQueue(fromUserId);
           console.log(`✅ Remote description設定完了 with ${fromUserId}`);
         } else if (peer.signalingState === "stable") {
           console.log(`ℹ️ 接続済み (stable状態) - answerをスキップ: ${fromUserId}`);
@@ -495,6 +555,8 @@ class WebRTCManager {
         }
       } catch (error) {
         console.error(`❌ Answer処理エラー ${fromUserId}:`, error);
+      } finally {
+        this.processingAnswers.delete(fromUserId);
       }
     } else {
       console.warn(`⚠️ ピア接続が見つかりません: ${fromUserId}`);
@@ -511,9 +573,12 @@ class WebRTCManager {
           hasRemoteDescription: !!peer.remoteDescription,
         });
 
-        // remote descriptionが設定されていない場合はスキップ
+        // remote descriptionが設定されていない場合はキューに追加
         if (!peer.remoteDescription) {
-          console.warn(`⚠️ Remote description未設定、ICE候補をスキップ: ${fromUserId}`);
+          console.warn(`⚠️ Remote description未設定、ICE候補をキューに追加: ${fromUserId}`);
+          const queue = this.iceCandidateQueue.get(fromUserId) || [];
+          queue.push(candidate);
+          this.iceCandidateQueue.set(fromUserId, queue);
           return;
         }
 
@@ -560,33 +625,15 @@ class WebRTCManager {
 
     console.log(`📊 送信完了: ${sentCount}/${this.dataChannels.size} 接続`);
 
-    // WebRTC送信が失敗した場合のフォールバック（Socket.IO）
-    if (sentCount === 0) {
-      console.log("🔄 Socket.IOフォールバック使用（WebRTC送信失敗）");
-      this.sendViaSocketIO(message);
+    // WebRTC送信が失敗した場合のフォールバックは削除
+    if (sentCount < this.dataChannels.size) {
+      console.warn(`一部のピアに送信できませんでした: ${sentCount}/${this.dataChannels.size}`);
     }
   }
 
   sendViaSocketIO(message) {
-    console.log("📡 Socket.IOでメッセージ送信:", message.type, message.data);
-
-    switch (message.type) {
-      case "cursor":
-        this.socket.emit("cursor-update", message.data);
-        break;
-      case "idea":
-        console.log("💡 Socket.IOでアイデア送信:", message.data);
-        this.socket.emit("add-idea", message.data);
-        break;
-      case "marker":
-        console.log("📍 Socket.IOでマーカー送信:", message.data);
-        this.socket.emit("add-marker", message.data);
-        break;
-      case "timeline":
-        console.log("📊 Socket.IOでタイムライン送信:", message.data);
-        this.socket.emit("timeline-update", message.data);
-        break;
-    }
+    // この関数はフォールバック削除により使用されません
+    console.warn("sendViaSocketIO is deprecated and should not be called.");
   }
 
   handleWebRTCMessage(message, fromUserId) {
@@ -648,18 +695,15 @@ class WebRTCManager {
   }
 
   handleRemoteIdeaAdded(idea, fromUserId) {
-    console.log("🎉 Socket.IO経由でアイデア受信:", idea, "from:", fromUserId);
-    this.emit("ideaReceived", idea);
+    // フォールバックは削除されたため、このイベントは使用されない
   }
 
   handleRemoteMarkerAdded(marker, fromUserId) {
-    console.log("🎉 Socket.IO経由でマーカー受信:", marker, "from:", fromUserId);
-    this.emit("markerReceived", marker);
+    // フォールバックは削除されたため、このイベントは使用されない
   }
 
   handleRemoteTimelineUpdated(timeline, fromUserId) {
-    console.log("🎉 Socket.IO経由でタイムライン受信:", timeline, "from:", fromUserId);
-    this.emit("timelineReceived", timeline);
+    // フォールバックは削除されたため、このイベントは使用されない
   }
 
   // 公開メソッド
@@ -768,6 +812,37 @@ class WebRTCManager {
           this.createPeerConnection(userId);
         }, 2000);
       }
+    }
+  }
+
+  async processIceCandidateQueue(userId) {
+    const peer = this.peerConnections.get(userId);
+    const queue = this.iceCandidateQueue.get(userId);
+
+    if (peer && queue && queue.length > 0) {
+      console.log(`⚙️ ${userId}のICE候補キューを処理中 (${queue.length}個)`);
+      for (const candidate of queue) {
+        try {
+          await peer.addIceCandidate(candidate);
+        } catch (error) {
+          console.error(`キューからのICE候補追加に失敗: ${userId}`, error);
+        }
+      }
+      this.iceCandidateQueue.set(userId, []); // キューをクリア
+    }
+  }
+
+  // 同一SDPかどうかを簡易判定（type と sdp の一致）
+  _isSameDescription(a, b) {
+    try {
+      if (!a || !b) return false;
+      const at = typeof a.type === "string" ? a.type : a?.type;
+      const bt = typeof b.type === "string" ? b.type : b?.type;
+      const as = typeof a.sdp === "string" ? a.sdp : a?.sdp;
+      const bs = typeof b.sdp === "string" ? b.sdp : b?.sdp;
+      return at === bt && as === bs;
+    } catch (_) {
+      return false;
     }
   }
 }

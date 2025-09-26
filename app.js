@@ -333,6 +333,7 @@ function addIdeaCard(title, description, type, day, fromRemote = false) {
   console.log("- window.webRTCManager:", !!window.webRTCManager);
 
   if (!fromRemote && collaborationEnabled && window.webRTCManager) {
+    const notification = showNotification("アイデアを保存中...", "info", 10000);
     console.log("📤 WebRTC送信開始:", ideaData);
     console.log("WebRTCManager詳細状態:", {
       initialized: window.webRTCManager.isInitialized,
@@ -345,8 +346,20 @@ function addIdeaCard(title, description, type, day, fromRemote = false) {
     try {
       window.webRTCManager.sendIdea(ideaData);
       console.log("✅ WebRTC送信完了");
+      notification.textContent = "同期完了！";
+      notification.className = "notification success";
+      setTimeout(() => {
+        notification.style.opacity = "0";
+        setTimeout(() => {
+          if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+          }
+        }, 300);
+      }, 1500);
     } catch (error) {
       console.error("❌ WebRTC送信エラー:", error);
+      notification.textContent = "同期失敗...";
+      notification.className = "notification error";
     }
   } else {
     console.log("❌ WebRTC送信スキップ理由:", {
@@ -389,6 +402,23 @@ function closeModal() {
   document.getElementById("addForm").reset();
 }
 
+// 通知の表示
+function showNotification(message, type = "info", duration = 3000) {
+  const notification = document.createElement("div");
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  document.body.appendChild(notification);
+  setTimeout(() => {
+    notification.style.opacity = "0";
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, 300);
+  }, duration);
+  return notification;
+}
+
 // フォーム送信処理
 document.getElementById("addForm").addEventListener("submit", function (e) {
   e.preventDefault();
@@ -407,8 +437,6 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
 
   closeModal();
 });
-
-// 重複している関数を削除（WebRTC対応版が上で定義されている）
 
 // URLからのインポート処理
 function importFromURL() {
@@ -682,20 +710,6 @@ function updateTimelineTime() {
     }
   });
   showNotification("スケジュールの時間を自動調整しました", "success");
-}
-
-// 通知の表示
-function showNotification(message, type = "info") {
-  const notification = document.createElement("div");
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  document.body.appendChild(notification);
-  setTimeout(() => {
-    notification.style.opacity = "0";
-    setTimeout(() => {
-      document.body.removeChild(notification);
-    }, 300);
-  }, 3000);
 }
 
 // リアルタイム共同編集のシミュレーション
