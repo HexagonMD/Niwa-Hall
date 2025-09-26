@@ -1,3 +1,4 @@
+let clickedLatLng = null;
 // アプリの状態管理
 let appState = {
   currentView: "idea",
@@ -402,6 +403,13 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
   // 新しいアイデアカードを追加
   addIdeaCard(title, description, pinType, day);
 
+  // もし地図クリックからモーダルが開かれた場合、ピンを追加
+  if (clickedLatLng) {
+    const data = { title: title, lat: clickedLatLng.lat, lng: clickedLatLng.lng };
+    addMarker(data, true);
+    clickedLatLng = null; //リセット
+  }
+
   // 通知を表示
   showNotification(`「${title}」を追加しました`, "success");
 
@@ -558,11 +566,9 @@ async function initMap() {
 
   map = new google.maps.Map(mapDiv, { center: { lat: 35.681236, lng: 139.767125 }, zoom: 12 });
   appState.pins.forEach((p) => addMarker(p));
-  map.addListener("click", (e) => {
-    const lat = e.latLng.lat();
-    const lng = e.latLng.lng();
-    const data = { title: "新しいピン", lat, lng };
-    addMarker(data, true);
+  map.addListener("dblclick", (e) => {
+    clickedLatLng = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+    openModal();
   });
 }
 
