@@ -44,7 +44,7 @@ async function initWebRTC() {
     window.webRTCManager.on("ideaReceived", (data) => {
       console.log("🎉 アイデア受信イベント発火:", data);
       console.log("📥 受信したデータ:", JSON.stringify(data, null, 2));
-      addIdeaCard(data.title, data.description, data.type, data.day, true);
+      addIdeaCard(data.title, data.description, data.type, data.day, true, data.startTime, data.duration, data.endTime);
       console.log("✅ 受信アイデアを画面に追加完了");
     });
 
@@ -275,7 +275,7 @@ function syncTripData(tripData) {
     tripData.ideas.forEach((idea, index) => {
       console.log(`📝 アイデア${index + 1}を表示:`, idea);
       // fromRemote = true で追加（WebRTC送信をスキップ）
-      addIdeaCard(idea.title, idea.description, idea.type, idea.day, true);
+      addIdeaCard(idea.title, idea.description, idea.type, idea.day, true, idea.startTime, idea.duration, idea.endTime);
     });
 
     console.log("✅ 全てのアイデア同期完了");
@@ -297,8 +297,8 @@ function syncTripData(tripData) {
 window.syncTripData = syncTripData;
 
 // アイデアカードの追加（WebRTC対応版）
-function addIdeaCard(title, description, type, day, fromRemote = false) {
-  console.log("🎯 addIdeaCard呼び出し:", { title, description, type, day, fromRemote });
+function addIdeaCard(title, description, type, day, fromRemote = false, startTime, duration, endTime) {
+  console.log("🎯 addIdeaCard呼び出し:", { title, description, type, day, fromRemote, startTime, duration, endTime });
 
   const ideaBoard = document.getElementById("ideaBoard");
   if (!ideaBoard) {
@@ -312,12 +312,24 @@ function addIdeaCard(title, description, type, day, fromRemote = false) {
   const typeEmoji = { food: "🍜", sightseeing: "🏔️", hotel: "🏨", transport: "🚗" };
   const typeLabel = { food: "グルメ", sightseeing: "観光", hotel: "宿泊", transport: "交通" };
 
-  const ideaData = { title, description, type, day, id: Date.now() };
+  const ideaData = { title, description, type, day, id: Date.now(), startTime, duration, endTime };
   appState.ideas.push(ideaData);
+
+  let timeInfoHTML = '';
+  if (startTime || duration || endTime) {
+    timeInfoHTML = `
+      <div class="idea-time-info">
+        ${startTime ? `<span>開始: ${startTime}</span>` : ''}
+        ${duration ? `<span>所要: ${duration}</span>` : ''}
+        ${endTime ? `<span>終了: ${endTime}</span>` : ''}
+      </div>
+    `;
+  }
 
   card.innerHTML = `
         <h3>${typeEmoji[type]} ${title}</h3>
         <p>${description}</p>
+        ${timeInfoHTML}
         <div class="idea-tags">
             <span class="tag">${typeLabel[type]}</span>
             ${day !== "0" ? `<span class="tag">${day}日目</span>` : ""}
@@ -397,11 +409,14 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
   const title = document.getElementById("itemTitle").value;
   const description = document.getElementById("itemDescription").value;
   const url = document.getElementById("itemUrl").value;
+  const startTime = document.getElementById("itemStartTime").value;
+  const duration = document.getElementById("itemDuration").value;
+  const endTime = document.getElementById("itemEndTime").value;
   const pinType = document.querySelector('input[name="pinType"]:checked').value;
   const day = document.getElementById("itemDay").value;
 
   // 新しいアイデアカードを追加
-  addIdeaCard(title, description, pinType, day);
+  addIdeaCard(title, description, pinType, day, false, startTime, duration, endTime);
 
   // もし地図クリックからモーダルが開かれた場合、ピンを追加
   if (clickedLatLng) {
@@ -797,7 +812,76 @@ document.addEventListener("DOMContentLoaded", function () {
     initWebRTC();
     showNotification("協働機能を初期化中...", "info");
   }, 1000);
+
+  // 時間の自動計算
+  const startTimeInput = document.getElementById("itemStartTime");
+  const durationInput = document.getElementById("itemDuration");
+  const endTimeInput = document.getElementById("itemEndTime");
+
+  startTimeInput.addEventListener("blur", autoCalculateTime);
+  durationInput.addEventListener("blur", autoCalculateTime);
+  endTimeInput.addEventListener("blur", autoCalculateTime);
 });
+
+function autoCalculateTime() {
+  const startTimeInput = document.getElementById("itemStartTime");
+  const durationInput = document.getElementById("itemDuration");
+  const endTimeInput = document.getElementById("itemEndTime");
+
+  const startTime = startTimeInput.value;
+  const duration = durationInput.value;
+  const endTime = endTimeInput.value;
+
+  if (startTime && duration && !endTime) {
+    const start = new Date(`1970-01-01T${startTime}:00`);
+    const durationMinutes = parseDurationToMinutes(duration);
+    if (isNaN(start) || isNaN(durationMinutes)) return;
+    start.setMinutes(start.getMinutes() + durationMinutes);
+    endTimeInput.value = start.toTimeString().slice(0, 5);
+  } else if (startTime && !duration && endTime) {
+    const start = new Date(`1970-01-01T${startTime}:00`);
+    const end = new Date(`1970-01-01T${endTime}:00`);
+    if (isNaN(start) || isNaN(end)) return;
+    let diffMinutes = (end - start) / (1000 * 60);
+    if (diffMinutes < 0) diffMinutes += 24 * 60; // 日付をまたぐ場合
+    durationInput.value = formatMinutesToDuration(diffMinutes);
+  } else if (!startTime && duration && endTime) {
+    const end = new Date(`1970-01-01T${endTime}:00`);
+    const durationMinutes = parseDurationToMinutes(duration);
+    if (isNaN(end) || isNaN(durationMinutes)) return;
+    end.setMinutes(end.getMinutes() - durationMinutes);
+    startTimeInput.value = end.toTimeString().slice(0, 5);
+  }
+}
+
+function parseDurationToMinutes(durationStr) {
+  let totalMinutes = 0;
+  const hourMatch = durationStr.match(/(\d+)時間/);
+  const minMatch = durationStr.match(/(\d+)分/);
+  const hMatch = durationStr.match(/(\d+)h/);
+  const mMatch = durationStr.match(/(\d+)m/);
+
+  if (hourMatch) totalMinutes += parseInt(hourMatch[1]) * 60;
+  if (minMatch) totalMinutes += parseInt(minMatch[1]);
+  if (hMatch) totalMinutes += parseInt(hMatch[1]) * 60;
+  if (mMatch) totalMinutes += parseInt(mMatch[1]);
+  
+  // 数字のみの場合、分として解釈
+  if (!hourMatch && !minMatch && !hMatch && !mMatch && !isNaN(parseInt(durationStr))) {
+    totalMinutes = parseInt(durationStr);
+  }
+
+  return totalMinutes;
+}
+
+function formatMinutesToDuration(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  let result = "";
+  if (h > 0) result += `${h}時間`;
+  if (m > 0) result += `${m}分`;
+  return result || "0分";
+}
 
 function filterPinsByDay(day) {
   console.log(`Filtering pins for: ${day}`);
@@ -858,7 +942,7 @@ function refreshUI() {
   const ideaBoard = document.getElementById("ideaBoard");
   ideaBoard.innerHTML = "";
   appState.ideas.forEach((idea) => {
-    addIdeaCard(idea.title, idea.description, idea.type, idea.day);
+    addIdeaCard(idea.title, idea.description, idea.type, idea.day, false, idea.startTime, idea.duration, idea.endTime);
   });
   const timeline = document.getElementById("timeline");
   timeline.innerHTML = "";
