@@ -1,4 +1,6 @@
 let clickedLatLng = null;
+let selectedPlace = null;
+let autocomplete;
 // アプリの状態管理
 let appState = {
   currentView: "idea",
@@ -51,11 +53,6 @@ async function initWebRTC() {
     window.webRTCManager.on("markerReceived", (data) => {
       console.log("📍 マーカー受信:", data);
       addMapMarker(data.lat, data.lng, data.title, true);
-    });
-
-    window.webRTCManager.on("timelineReceived", (data) => {
-      console.log("📊 タイムライン受信:", data);
-      addTimelineItem(data.title, data.time, data.day, true);
     });
 
     window.webRTCManager.on("userJoined", (user) => {
@@ -391,6 +388,11 @@ function switchView(viewName) {
   if (viewName === "map") {
     initMap();
   }
+
+  // フローチャートビューの場合、フローチャートを更新
+  if (viewName === "flowchart") {
+    updateFlowchart();
+  }
 }
 
 // モーダルの開閉
@@ -400,6 +402,8 @@ function openModal() {
 function closeModal() {
   document.getElementById("modal").classList.remove("active");
   document.getElementById("addForm").reset();
+  document.getElementById("itemLocation").value = "";
+  selectedPlace = null;
 }
 
 // フォーム送信処理
@@ -423,11 +427,20 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
     const data = { title: title, lat: clickedLatLng.lat, lng: clickedLatLng.lng };
     addMarker(data, true);
     clickedLatLng = null; //リセット
+  } else if (selectedPlace && selectedPlace.geometry) {
+    // もし場所検索から場所が選択された場合、ピンを追加
+    const data = {
+      title: selectedPlace.name,
+      lat: selectedPlace.geometry.location.lat(),
+      lng: selectedPlace.geometry.location.lng(),
+    };
+    addMarker(data, true);
   }
 
   // 通知を表示
   showNotification(`「${title}」を追加しました`, "success");
 
+  updateFlowchart(); // フローチャートを更新
   closeModal();
 });
 
@@ -584,6 +597,21 @@ async function initMap() {
   map.addListener("dblclick", (e) => {
     clickedLatLng = { lat: e.latLng.lat(), lng: e.latLng.lng() };
     openModal();
+  });
+
+  // 場所検索オートコンプリートの初期化
+  const locationInput = document.getElementById("itemLocation");
+  autocomplete = new google.maps.places.Autocomplete(locationInput, {
+    fields: ["name", "geometry", "website"],
+  });
+
+  autocomplete.addListener("place_changed", () => {
+    selectedPlace = autocomplete.getPlace();
+    if (selectedPlace) {
+      // 場所の情報をフォームに自動入力
+      document.getElementById("itemTitle").value = selectedPlace.name || "";
+      document.getElementById("itemUrl").value = selectedPlace.website || "";
+    }
   });
 }
 
@@ -813,6 +841,9 @@ document.addEventListener("DOMContentLoaded", function () {
     showNotification("協働機能を初期化中...", "info");
   }, 1000);
 
+  // マップとオートコンプリートを初期化
+  initMap();
+
   // 時間の自動計算
   const startTimeInput = document.getElementById("itemStartTime");
   const durationInput = document.getElementById("itemDuration");
@@ -951,36 +982,30 @@ function refreshUI() {
   });
 }
 
-function addTimelineItem(item, fromRemote = false) {
-  // itemがオブジェクトでない場合（旧形式）の処理
-  let timelineData;
-  if (typeof item === "string") {
-    // 旧形式: addTimelineItem(title, time, day, fromRemote)
-    timelineData = {
-      title: arguments[0],
-      time: arguments[1] || "00:00",
-      day: arguments[2] || "1",
-      duration: "1時間",
-      id: Date.now(),
-    };
-    fromRemote = arguments[3] || false;
-  } else {
-    // 新形式: オブジェクト
-    timelineData = {
-      ...item,
-      id: item.id || Date.now(),
-    };
-  }
+function updateFlowchart() {
+  const timeline = document.getElementById("timeline");
+  timeline.innerHTML = ""; // タイムラインをクリア
 
+  const timedIdeas = appState.ideas
+    .filter(idea => idea.startTime)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  timedIdeas.forEach(idea => {
+    addTimelineItem(idea);
+  });
+}
+
+function addTimelineItem(idea) {
   const timeline = document.getElementById("timeline");
   const timelineItem = document.createElement("div");
   timelineItem.className = "timeline-item";
   timelineItem.draggable = true;
+
   timelineItem.innerHTML = `
-    <div class="time-display">${timelineData.time}</div>
+    <div class="time-display">${idea.startTime || "未定"}</div>
     <div class="timeline-content">
-      <div class="timeline-title">${timelineData.title}</div>
-      <div class="timeline-duration">所要時間: ${timelineData.duration}</div>
+      <div class="timeline-title">${idea.title}</div>
+      <div class="timeline-duration">所要時間: ${idea.duration || "未定"}</div>
     </div>
   `;
 
@@ -989,14 +1014,6 @@ function addTimelineItem(item, fromRemote = false) {
   timelineItem.addEventListener("drop", handleDrop);
   timelineItem.addEventListener("dragend", handleDragEnd);
   timeline.appendChild(timelineItem);
-
-  // appStateに追加
-  appState.timeline.push(timelineData);
-
-  // WebRTC同期（リモートからの変更でなければ送信）
-  if (!fromRemote && collaborationEnabled && window.webRTCManager) {
-    window.webRTCManager.sendTimeline(timelineData);
-  }
 }
 
 // キーボードショートカット

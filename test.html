@@ -55,30 +55,6 @@
                         <button class="btn btn-primary" onclick="importFromURL()">インポート</button>
                     </div>
                     <div class="idea-board" id="ideaBoard">
-                        <div class="idea-card">
-                            <h3>🍜 ラーメン横丁</h3>
-                            <p>札幌の有名なラーメンスポット。味噌ラーメンが特におすすめ！</p>
-                            <div class="idea-tags">
-                                <span class="tag">グルメ</span>
-                                <span class="tag">1日目</span>
-                            </div>
-                        </div>
-                        <div class="idea-card">
-                            <h3>🏔️ 羊蹄山</h3>
-                            <p>北海道の富士山とも呼ばれる美しい山。写真スポットとして最高！</p>
-                            <div class="idea-tags">
-                                <span class="tag">観光</span>
-                                <span class="tag">2日目</span>
-                            </div>
-                        </div>
-                        <div class="idea-card">
-                            <h3>♨️ 登別温泉</h3>
-                            <p>地獄谷も見学できる有名な温泉地。宿泊候補地として検討中。</p>
-                            <div class="idea-tags">
-                                <span class="tag">宿泊</span>
-                                <span class="tag">温泉</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -149,12 +125,28 @@
                     <input type="text" id="itemTitle" placeholder="例: おいしいラーメン屋">
                 </div>
                 <div class="form-group">
+                    <label>場所</label>
+                    <input type="text" id="itemLocation" placeholder="場所を検索...">
+                </div>
+                <div class="form-group">
                     <label>説明</label>
                     <textarea id="itemDescription" placeholder="詳細な説明を入力..."></textarea>
                 </div>
                 <div class="form-group">
                     <label>URL</label>
                     <input type="url" id="itemUrl" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label>開始時間</label>
+                    <input type="time" id="itemStartTime">
+                </div>
+                <div class="form-group">
+                    <label>所要時間</label>
+                    <input type="text" id="itemDuration" placeholder="例: 1時間30分">
+                </div>
+                <div class="form-group">
+                    <label>終了時間</label>
+                    <input type="time" id="itemEndTime">
                 </div>
                 <div class="form-group">
                     <label>ピンの種類</label>
