@@ -102,7 +102,7 @@ io.on("connection", (socket) => {
   // ルーム状態要求
   socket.on("get-room-state", (data) => {
     const { roomId } = data;
-    const room = rooms[roomId];
+    const room = rooms.get(roomId);
 
     if (room) {
       socket.emit("room-state", {
@@ -169,47 +169,6 @@ io.on("connection", (socket) => {
       socket.to(currentRoom).emit("trip-data-update", {
         fromUserId: currentUserId,
         data,
-      });
-    }
-  });
-
-  // アイデアカード追加
-  socket.on("add-idea", (ideaData) => {
-    if (currentRoom) {
-      const room = rooms.get(currentRoom);
-      const idea = { ...ideaData, id: Date.now(), userId: currentUserId };
-      room.tripData.ideas.push(idea);
-
-      socket.to(currentRoom).emit("idea-added", {
-        fromUserId: currentUserId,
-        idea,
-      });
-    }
-  });
-
-  // マーカー追加
-  socket.on("add-marker", (markerData) => {
-    if (currentRoom) {
-      const room = rooms.get(currentRoom);
-      const marker = { ...markerData, id: Date.now(), userId: currentUserId };
-      room.tripData.pins.push(marker);
-
-      socket.to(currentRoom).emit("marker-added", {
-        fromUserId: currentUserId,
-        marker,
-      });
-    }
-  });
-
-  // タイムライン更新
-  socket.on("timeline-update", (timelineData) => {
-    if (currentRoom) {
-      const room = rooms.get(currentRoom);
-      room.tripData.timeline = timelineData;
-
-      socket.to(currentRoom).emit("timeline-updated", {
-        fromUserId: currentUserId,
-        timeline: timelineData,
       });
     }
   });
