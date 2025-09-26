@@ -1,10 +1,12 @@
-const express = require("express");
+﻿const express = require("express");
 const http = require("http");
+const fs = require("fs");
 const socketIo = require("socket.io");
 const cors = require("cors");
 const path = require("path");
 
 const app = express();
+const CLIENT_DIST_PATH = path.join(__dirname, '..', 'frontend', 'dist');
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
@@ -12,11 +14,10 @@ const io = socketIo(server, {
     methods: ["GET", "POST"],
   },
 });
-
 app.use(cors());
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(CLIENT_DIST_PATH));
 
-// ルーム管理
+// 繝ｫ繝ｼ繝邂｡逅・
 const rooms = new Map();
 
 class Room {
@@ -63,7 +64,7 @@ io.on("connection", (socket) => {
   let currentRoom = null;
   let currentUserId = null;
 
-  // ルーム参加
+  // 繝ｫ繝ｼ繝蜿ょ刈
   socket.on("join-room", (data) => {
     const { roomId, userId, userName } = data;
 
@@ -83,14 +84,14 @@ io.on("connection", (socket) => {
 
     socket.join(roomId);
 
-    // 既存ユーザーに新規参加を通知
+    // 譌｢蟄倥Θ繝ｼ繧ｶ繝ｼ縺ｫ譁ｰ隕丞盾蜉繧帝夂衍
     socket.to(roomId).emit("user-joined", {
       userId,
       userName,
       users: room.getUserList(),
     });
 
-    // 新規ユーザーに現在の状態を送信
+    // 譁ｰ隕上Θ繝ｼ繧ｶ繝ｼ縺ｫ迴ｾ蝨ｨ縺ｮ迥ｶ諷九ｒ騾∽ｿ｡
     socket.emit("room-state", {
       users: room.getUserList(),
       tripData: room.tripData,
@@ -99,7 +100,7 @@ io.on("connection", (socket) => {
     console.log(`User ${userName} (${userId}) joined room ${roomId}`);
   });
 
-  // ルーム状態要求
+  // 繝ｫ繝ｼ繝迥ｶ諷玖ｦ∵ｱ・
   socket.on("get-room-state", (data) => {
     const { roomId } = data;
     const room = rooms.get(roomId);
@@ -113,7 +114,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // WebRTC シグナリング: オファー送信
+  // WebRTC 繧ｷ繧ｰ繝翫Μ繝ｳ繧ｰ: 繧ｪ繝輔ぃ繝ｼ騾∽ｿ｡
   socket.on("webrtc-offer", (data) => {
     const { targetUserId, offer } = data;
     socket.to(currentRoom).emit("webrtc-offer", {
@@ -123,7 +124,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  // WebRTC シグナリング: アンサー送信
+  // WebRTC 繧ｷ繧ｰ繝翫Μ繝ｳ繧ｰ: 繧｢繝ｳ繧ｵ繝ｼ騾∽ｿ｡
   socket.on("webrtc-answer", (data) => {
     const { targetUserId, answer } = data;
     socket.to(currentRoom).emit("webrtc-answer", {
@@ -133,7 +134,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  // WebRTC シグナリング: ICE候補送信
+  // WebRTC 繧ｷ繧ｰ繝翫Μ繝ｳ繧ｰ: ICE蛟呵｣憺∽ｿ｡
   socket.on("webrtc-ice-candidate", (data) => {
     const { targetUserId, candidate } = data;
     socket.to(currentRoom).emit("webrtc-ice-candidate", {
@@ -143,7 +144,7 @@ io.on("connection", (socket) => {
     });
   });
 
-  // カーソル位置更新
+  // 繧ｫ繝ｼ繧ｽ繝ｫ菴咲ｽｮ譖ｴ譁ｰ
   socket.on("cursor-update", (data) => {
     if (currentRoom && currentUserId) {
       const room = rooms.get(currentRoom);
@@ -160,7 +161,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 旅行計画データ更新
+  // 譌・｡瑚ｨ育判繝・・繧ｿ譖ｴ譁ｰ
   socket.on("trip-data-update", (data) => {
     if (currentRoom) {
       const room = rooms.get(currentRoom);
@@ -173,7 +174,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 接続切断処理
+  // 謗･邯壼・譁ｭ蜃ｦ逅・
   socket.on("disconnect", () => {
     if (currentRoom && currentUserId) {
       const room = rooms.get(currentRoom);
@@ -185,7 +186,7 @@ io.on("connection", (socket) => {
           users: room.getUserList(),
         });
 
-        // ルームが空になったら削除
+        // 繝ｫ繝ｼ繝縺檎ｩｺ縺ｫ縺ｪ縺｣縺溘ｉ蜑企勁
         if (room.users.size === 0) {
           rooms.delete(currentRoom);
           console.log(`Room ${currentRoom} deleted (empty)`);
@@ -197,17 +198,24 @@ io.on("connection", (socket) => {
   });
 });
 
-// HTTP ルート
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "test.html"));
-});
+// HTTP 繝ｫ繝ｼ繝・
+const sendClientApp = (req, res) => {
+  const indexPath = path.join(CLIENT_DIST_PATH, 'index.html');
+  if (!fs.existsSync(indexPath)) {
+    res.status(500).send('Frontend build not found. Run npm --prefix frontend run build first.');
+    return;
+  }
+  res.sendFile(indexPath);
+};
 
-app.get("/room/:roomId", (req, res) => {
-  res.sendFile(path.join(__dirname, "test.html"));
-});
+app.get('/', sendClientApp);
+app.get('/room/:roomId', sendClientApp);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🚀 Travel Planner WebRTC Server running on port ${PORT}`);
-  console.log(`📍 Open http://localhost:${PORT} to start planning!`);
+  console.log(`噫 Travel Planner WebRTC Server running on port ${PORT}`);
+  console.log(`桃 Open http://localhost:${PORT} to start planning!`);
 });
+
+
+

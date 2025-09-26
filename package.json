@@ -1,11 +1,11 @@
-{
+﻿{
   "name": "travel-planner-webrtc",
   "version": "1.0.0",
   "description": "WebRTC-enabled collaborative travel planner",
-  "main": "server.js",
+  "main": "server/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
