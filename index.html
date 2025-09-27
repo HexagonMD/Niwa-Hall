@@ -67,8 +67,11 @@
                             <button class="day-tab">2日目</button>
                             <button class="day-tab">3日目</button>
                         </div>
+                        <div class="map-search-container">
+                            <input type="text" id="mapSearchInput" placeholder="場所を検索..." class="map-search-input">
+                            <div id="mapSearchResults"></div>
+                        </div>
                         <div style="flex: 1;"></div>
-                        <button class="btn btn-primary" onclick="centerMap()">現在地</button>
                     </div>
                     <div id="map"></div>
                 </div>
@@ -110,8 +113,7 @@
         </div>
     </div>
 
-    <!-- 追加ボタン -->
-    <button class="fab" onclick="openModal()">+</button>
+
 
     <!-- モーダル -->
     <div class="modal" id="modal">
@@ -125,12 +127,13 @@
                     <input type="text" id="itemTitle" placeholder="例: おいしいラーメン屋">
                 </div>
                 <div class="form-group">
-                    <label>場所</label>
-                    <input type="text" id="itemLocation" placeholder="場所を検索...">
-                </div>
-                <div class="form-group">
                     <label>説明</label>
                     <textarea id="itemDescription" placeholder="詳細な説明を入力..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>写真（複数選択可）</label>
+                    <input type="file" id="itemPhotos" multiple accept="image/*">
+                    <div class="photo-previews" id="photoPreviews"></div>
                 </div>
                 <div class="form-group">
                     <label>URL</label>

@@ -1,6 +1,9 @@
 let clickedLatLng = null;
 let selectedPlace = null;
 let autocomplete;
+let editingPinId = null; // 編集中のピンのIDを保持
+let currentEditingPhotos = []; // 編集中の写真リスト
+
 // アプリの状態管理
 let appState = {
   currentView: "idea",
@@ -266,7 +269,8 @@ function addIdeaCard(
   startTime,
   duration,
   endTime,
-  existingId
+  existingId,
+  photos = []
 ) {
   console.log("🎯 addIdeaCard呼び出し:", {
     title,
@@ -278,6 +282,7 @@ function addIdeaCard(
     duration,
     endTime,
     existingId,
+    photos,
   });
 
   const ideaData = {
@@ -289,6 +294,7 @@ function addIdeaCard(
     startTime,
     duration,
     endTime,
+    photos,
   };
   const existingIndex = appState.ideas.findIndex((idea) => idea.id === ideaData.id);
   if (existingIndex >= 0) {
@@ -359,31 +365,208 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
   const endTime = document.getElementById("itemEndTime").value;
   const pinType = document.querySelector('input[name="pinType"]:checked').value;
   const day = document.getElementById("itemDay").value;
+  const photos = currentEditingPhotos; // グローバルの一時配列から取得
 
-  // 新しいアイデアカードを追加
-  addIdeaCard(title, description, pinType, day, false, startTime, duration, endTime);
+  if (editingPinId) {
+    // --- 編集モード ---
+    const pinIndex = appState.pins.findIndex(p => p.id === editingPinId);
+    if (pinIndex > -1) {
+      appState.pins[pinIndex].title = title;
+    }
 
-  // もし地図クリックからモーダルが開かれた場合、ピンを追加
-  if (clickedLatLng) {
-    const data = { title: title, lat: clickedLatLng.lat, lng: clickedLatLng.lng };
-    addMarker(data, true);
-    clickedLatLng = null; //リセット
-  } else if (selectedPlace && selectedPlace.geometry) {
-    // もし場所検索から場所が選択された場合、ピンを追加
-    const data = {
-      title: selectedPlace.name,
-      lat: selectedPlace.geometry.location.lat(),
-      lng: selectedPlace.geometry.location.lng(),
-    };
-    addMarker(data, true);
+    const ideaIndex = appState.ideas.findIndex(i => i.id === editingPinId);
+    if (ideaIndex > -1) {
+      appState.ideas[ideaIndex] = {
+        ...appState.ideas[ideaIndex],
+        title,
+        description,
+        type: pinType,
+        day,
+        startTime,
+        duration,
+        endTime,
+        photos, // 更新された写真リスト
+      };
+    }
+
+    renderAllMarkers();
+    renderIdeaCard(appState.ideas[ideaIndex]);
+    showNotification(`「${title}」を更新しました`, "success");
+
+  } else {
+    // This block might be deprecated now, but we'll leave it for now.
+    const newId = Date.now();
+    addIdeaCard(title, description, pinType, day, false, startTime, duration, endTime, newId, photos);
+
+    if (clickedLatLng) {
+      const data = { id: newId, title: title, lat: clickedLatLng.lat, lng: clickedLatLng.lng };
+      addMarker(data, true);
+      clickedLatLng = null;
+    } else if (selectedPlace && selectedPlace.geometry) {
+      const data = {
+        id: newId,
+        title: selectedPlace.name,
+        lat: selectedPlace.geometry.location.lat(),
+        lng: selectedPlace.geometry.location.lng(),
+      };
+      addMarker(data, true);
+    }
+    showNotification(`「${title}」を追加しました`, "success");
   }
 
-  // 通知を表示
-  showNotification(`「${title}」を追加しました`, "success");
-
-  updateFlowchart(); // フローチャートを更新
+  updateFlowchart();
   closeModal();
 });
+
+function renderPhotoPreviews() {
+    const previewContainer = document.getElementById('photoPreviews');
+    previewContainer.innerHTML = '';
+    currentEditingPhotos.forEach(photoSrc => {
+        const img = document.createElement('img');
+        img.src = photoSrc;
+        previewContainer.appendChild(img);
+    });
+}
+
+// 写真プレビューの処理
+document.getElementById('itemPhotos').addEventListener('change', function(event) {
+  const files = event.target.files;
+  let filesToProcess = files.length;
+
+  if (filesToProcess === 0) return;
+
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) {
+        filesToProcess--;
+        continue;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      currentEditingPhotos.push(e.target.result);
+      filesToProcess--;
+      if (filesToProcess === 0) {
+          renderPhotoPreviews();
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+function openEditModalForPin(pinData) {
+  editingPinId = pinData.id;
+  const idea = appState.ideas.find(i => i.id === pinData.id);
+
+  // フォームの値を設定
+  document.getElementById("itemTitle").value = pinData.title || '';
+  if (idea) {
+    document.getElementById("itemDescription").value = idea.description || '';
+    document.getElementById("itemUrl").value = idea.url || '';
+    document.getElementById("itemStartTime").value = idea.startTime || '';
+    document.getElementById("itemDuration").value = idea.duration || '';
+    document.getElementById("itemEndTime").value = idea.endTime || '';
+    document.querySelector(`input[name="pinType"][value="${idea.type || 'sightseeing'}"]`).checked = true;
+    document.getElementById("itemDay").value = idea.day || '0';
+    
+    // 写真データを一時配列にコピー
+    currentEditingPhotos = idea.photos ? [...idea.photos] : [];
+  } else {
+    // ideaがない場合（ピンのみの場合）
+    currentEditingPhotos = [];
+  }
+  
+  // 写真プレビューをレンダリング
+  renderPhotoPreviews();
+
+  openModal();
+}
+
+function createPinAndIdeaFromPlace(place) {
+  const newId = Date.now();
+
+  // Pinデータを作成
+  const pinData = {
+    id: newId,
+    title: place.name,
+    lat: place.geometry.location.lat(),
+    lng: place.geometry.location.lng(),
+  };
+
+  // 対応するIdeaデータを最小限で作成
+  const ideaData = {
+    id: newId,
+    title: place.name,
+    description: '',
+    type: 'sightseeing', // デフォルトのタイプ
+    day: '0', // デフォルトは未定
+  };
+
+  // appStateに追加
+  appState.pins.push(pinData);
+  appState.ideas.push(ideaData);
+
+  // 地図にマーカーを追加
+  addMarker(pinData, true);
+
+  // アイデアボードにカードを追加
+  renderIdeaCard(ideaData);
+
+  showNotification(`「${place.name}」をマップとアイデアに追加しました。クリックして詳細を編集できます。`, "success", 5000);
+}
+window.createPinAndIdeaFromPlace = createPinAndIdeaFromPlace;
+
+function deletePinAndIdea(pinData) {
+    // appState.pinsから削除
+    const pinIndex = appState.pins.findIndex(p => p.id === pinData.id);
+    if (pinIndex > -1) {
+        appState.pins.splice(pinIndex, 1);
+    }
+
+    // appState.ideasから削除
+    const ideaIndex = appState.ideas.findIndex(i => i.id === pinData.id);
+    if (ideaIndex > -1) {
+        appState.ideas.splice(ideaIndex, 1);
+    }
+
+    // UIを更新
+    renderAllMarkers(); // マップを更新
+    removeIdeaCard(pinData.id); // アイデアカードを削除
+
+    showNotification(`「${pinData.title}」を削除しました`, "success");
+}
+window.deletePinAndIdea = deletePinAndIdea;
+
+function createPinAndIdeaFromLatLng(latLng) {
+    const newId = Date.now();
+    const title = "新しい場所";
+
+    const pinData = {
+        id: newId,
+        title: title,
+        lat: latLng.lat(),
+        lng: latLng.lng(),
+    };
+
+    const ideaData = {
+        id: newId,
+        title: title,
+        description: "",
+        type: "sightseeing",
+        day: "0",
+        photos: [],
+    };
+
+    appState.pins.push(pinData);
+    appState.ideas.push(ideaData);
+
+    addMarker(pinData, false);
+    renderIdeaCard(ideaData);
+
+    // すぐに編集モーダルを開く
+    openEditModalForPin(pinData);
+}
+window.createPinAndIdeaFromLatLng = createPinAndIdeaFromLatLng;
+
 
 // URLからのインポート処理
 function importFromURL() {

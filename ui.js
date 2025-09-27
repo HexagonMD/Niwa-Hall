@@ -98,6 +98,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeof window.selectedPlace !== "undefined") {
       window.selectedPlace = null;
     }
+    if (typeof window.editingPinId !== "undefined") {
+      window.editingPinId = null; // 編集状態をリセット
+    }
+    if (typeof window.currentEditingPhotos !== "undefined") {
+      window.currentEditingPhotos = []; // 編集中の写真リストをリセット
+    }
   }
 
   function switchView(viewName) {
@@ -185,48 +191,67 @@ document.addEventListener("DOMContentLoaded", () => {
     let timeInfoHTML = "";
     if (ideaData.startTime || ideaData.duration || ideaData.endTime) {
       timeInfoHTML = `
-        <div class="idea-time-info">
-          ${ideaData.startTime ? `<span>開始: ${ideaData.startTime}</span>` : ""}
-          ${ideaData.duration ? `<span>所要: ${ideaData.duration}</span>` : ""}
-          ${ideaData.endTime ? `<span>終了: ${ideaData.endTime}</span>` : ""}
-        </div>
-      `;
-    }
-
-    card.innerHTML = `
-      <h3>${typeEmoji[ideaData.type] || "🗓️"} ${ideaData.title}</h3>
-      <p>${ideaData.description}</p>
-      ${timeInfoHTML}
-      <div class="idea-tags">
-        <span class="tag">${typeLabel[ideaData.type] || "その他"}</span>
-        ${
-          ideaData.day && ideaData.day !== "0" ? `<span class="tag">${ideaData.day}日目</span>` : ""
+            <div class="idea-time-info">
+              ${ideaData.startTime ? `<span>開始: ${ideaData.startTime}</span>` : ""}
+              ${ideaData.duration ? `<span>所要: ${ideaData.duration}</span>` : ""}
+              ${ideaData.endTime ? `<span>終了: ${ideaData.endTime}</span>` : ""}
+            </div>
+          `;
         }
-      </div>
-    `;
-
+        
+        let photoHTML = '';
+        if (ideaData.photos && ideaData.photos.length > 0) {
+          photoHTML = `<div class="idea-photos">`;
+          ideaData.photos.forEach(photoSrc => {
+            photoHTML += `<img src="${photoSrc}" alt="idea photo">`;
+          });
+          photoHTML += `</div>`;
+        }
+        
+        card.innerHTML = `
+          <h3>${typeEmoji[ideaData.type] || "🗓️"} ${ideaData.title}</h3>
+          <p>${ideaData.description}</p>
+          ${photoHTML}
+          ${timeInfoHTML}
+          <div class="idea-tags">
+            <span class="tag">${typeLabel[ideaData.type] || "その他"}</span>
+            ${
+              ideaData.day && ideaData.day !== "0" ? `<span class="tag">${ideaData.day}日目</span>` : ""
+            }
+          </div>
+        `;
     if (isNew) {
       ideaBoard.appendChild(card);
       console.log("✅ アイデアカードを画面に追加しました");
     } else {
-      console.log("🔁 アイデアカードを更新しました");
-    }
-    return card;
-  }
-
-  window.showNotification = showNotification;
-  window.openModal = openModal;
-  window.closeModal = closeModal;
-  window.switchView = switchView;
-  window.updateUserList = updateUserList;
-  window.renderIdeaCard = renderIdeaCard;
-
-  window.UI = {
-    showNotification,
-    openModal,
-    closeModal,
-    switchView,
-    updateUserList,
-    renderIdeaCard,
-  };
-});
+          console.log("🔁 アイデアカードを更新しました");
+        }
+        return card;
+      }
+      
+      function removeIdeaCard(ideaId) {
+        const card = document.querySelector(`[data-idea-id="${ideaId}"]`);
+        if (card) {
+          card.parentElement.removeChild(card);
+          console.log(`✅ アイデアカード(id: ${ideaId})を削除しました`);
+        }
+      }
+      
+        window.showNotification = showNotification;
+        window.openModal = openModal;
+        window.closeModal = closeModal;
+        window.switchView = switchView;
+        window.updateUserList = updateUserList;
+        window.renderIdeaCard = renderIdeaCard;
+        window.removeIdeaCard = removeIdeaCard; // 公開
+      
+        window.UI = {
+          showNotification,
+          openModal,
+          closeModal,
+          switchView,
+          updateUserList,
+          renderIdeaCard,
+          removeIdeaCard,
+        };
+      });

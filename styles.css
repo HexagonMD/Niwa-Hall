@@ -151,6 +151,20 @@ body {
   font-size: 14px;
   margin-bottom: 10px;
 }
+
+.idea-photos {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.idea-photos img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
 .idea-tags {
   display: flex;
   flex-wrap: wrap;
@@ -193,6 +207,47 @@ body {
   background: #3498db;
   color: white;
 }
+
+.map-search-container {
+  position: relative;
+  width: 250px;
+}
+
+.map-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+/* Google Places Autocompleteのドロップダウンのスタイル */
+.pac-container {
+  border-radius: 5px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ddd;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.pac-item {
+  padding: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  border-top: 1px solid #f0f0f0;
+}
+
+.pac-item:first-child {
+  border-top: none;
+}
+
+.pac-item:hover {
+  background: #f8f8f8;
+}
+
+.pac-item-query {
+  font-weight: bold;
+}
+
 #map {
   flex: 1;
   background: #e0e0e0;
@@ -330,6 +385,22 @@ body {
   border-radius: 5px;
   font-size: 14px;
 }
+
+.photo-previews {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.photo-previews img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 5px;
+  border: 1px solid #ddd;
+}
+
 .form-group textarea {
   resize: vertical;
   min-height: 80px;
