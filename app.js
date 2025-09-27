@@ -12,9 +12,6 @@ let appState = {
   roomId: null,
 };
 
-// WebRTC Collaboration
-let collaborationEnabled = false;
-
 // WebRTC Manager初期化
 async function initWebRTC() {
   try {
@@ -71,7 +68,7 @@ async function initWebRTC() {
     });
 
     window.webRTCManager.on("roomJoined", (roomId) => {
-      collaborationEnabled = true;
+      window.collaborationEnabled = true;
       appState.roomId = roomId;
       console.log("🎯 ルーム参加完了、協働機能有効化:", { roomId, collaborationEnabled });
       updateUserList();
@@ -79,7 +76,7 @@ async function initWebRTC() {
     });
 
     window.webRTCManager.on("roomLeft", () => {
-      collaborationEnabled = false;
+      window.collaborationEnabled = false;
       appState.roomId = null;
       updateUserList();
     });
@@ -125,7 +122,7 @@ function leaveCollaboration() {
   if (window.webRTCManager && appState.roomId) {
     window.webRTCManager.leaveRoom();
     appState.roomId = null;
-    collaborationEnabled = false;
+    window.collaborationEnabled = false;
     showNotification("協働セッションから退出しました", "info");
   }
 }
