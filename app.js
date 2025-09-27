@@ -46,7 +46,17 @@ async function initWebRTC() {
     window.webRTCManager.on("ideaReceived", (data) => {
       console.log("🎉 アイデア受信イベント発火:", data);
       console.log("📥 受信したデータ:", JSON.stringify(data, null, 2));
-      addIdeaCard(data.title, data.description, data.type, data.day, true, data.startTime, data.duration, data.endTime);
+      addIdeaCard(
+        data.title,
+        data.description,
+        data.type,
+        data.day,
+        true,
+        data.startTime,
+        data.duration,
+        data.endTime,
+        data.id
+      );
       console.log("✅ 受信アイデアを画面に追加完了");
     });
 
@@ -82,29 +92,6 @@ async function initWebRTC() {
     console.error("❌ WebRTC初期化エラー:", error);
     showNotification("WebRTC初期化に失敗しました: " + error.message, "error");
   }
-}
-
-// WebRTC協調機能
-function showNotification(message, type = "info") {
-  const notification = document.createElement("div");
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === "success" ? "#4CAF50" : type === "error" ? "#f44336" : "#2196F3"};
-        color: white;
-        padding: 12px 20px;
-        border-radius: 4px;
-        z-index: 10000;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    `;
-  document.body.appendChild(notification);
-
-  setTimeout(() => {
-    notification.remove();
-  }, 3000);
 }
 
 // 協働セッションを開始
@@ -222,40 +209,6 @@ window.debugCollaboration = debugCollaboration;
 window.testSendIdea = testSendIdea;
 window.forceEnableCollaboration = forceEnableCollaboration;
 
-function updateUserList() {
-  // ユーザーリスト更新処理
-  if (window.webRTCManager && window.webRTCManager.users) {
-    // usersが配列の場合は length、オブジェクトの場合は Object.keys().length を使用
-    const userCount = Array.isArray(window.webRTCManager.users)
-      ? window.webRTCManager.users.length
-      : Object.keys(window.webRTCManager.users).length;
-    const userCountElement = document.getElementById("userCount");
-    const statusIndicator = document.getElementById("statusIndicator");
-    const collaborationBtn = document.getElementById("collaborationBtn");
-    const leaveBtn = document.getElementById("leaveBtn");
-
-    if (userCountElement) {
-      userCountElement.textContent = `${userCount}人がオンライン`;
-    }
-
-    if (statusIndicator) {
-      statusIndicator.style.background = collaborationEnabled ? "#27ae60" : "#e74c3c";
-    }
-
-    if (collaborationBtn && leaveBtn) {
-      if (collaborationEnabled && appState.roomId) {
-        collaborationBtn.style.display = "none";
-        leaveBtn.style.display = "inline-block";
-      } else {
-        collaborationBtn.style.display = "inline-block";
-        leaveBtn.style.display = "none";
-      }
-    }
-
-    console.log(`現在の参加者数: ${userCount}人`);
-  }
-}
-
 // 旅行データ同期関数（新規ユーザー入室時の既存データ表示用）
 function syncTripData(tripData) {
   console.log("🔄 tripData同期開始:", tripData);
@@ -272,7 +225,17 @@ function syncTripData(tripData) {
     tripData.ideas.forEach((idea, index) => {
       console.log(`📝 アイデア${index + 1}を表示:`, idea);
       // fromRemote = true で追加（WebRTC送信をスキップ）
-      addIdeaCard(idea.title, idea.description, idea.type, idea.day, true, idea.startTime, idea.duration, idea.endTime);
+      addIdeaCard(
+        idea.title,
+        idea.description,
+        idea.type,
+        idea.day,
+        true,
+        idea.startTime,
+        idea.duration,
+        idea.endTime,
+        idea.id
+      );
     });
 
     console.log("✅ 全てのアイデア同期完了");
@@ -294,47 +257,50 @@ function syncTripData(tripData) {
 window.syncTripData = syncTripData;
 
 // アイデアカードの追加（WebRTC対応版）
-function addIdeaCard(title, description, type, day, fromRemote = false, startTime, duration, endTime) {
-  console.log("🎯 addIdeaCard呼び出し:", { title, description, type, day, fromRemote, startTime, duration, endTime });
+function addIdeaCard(
+  title,
+  description,
+  type,
+  day,
+  fromRemote = false,
+  startTime,
+  duration,
+  endTime,
+  existingId
+) {
+  console.log("🎯 addIdeaCard呼び出し:", {
+    title,
+    description,
+    type,
+    day,
+    fromRemote,
+    startTime,
+    duration,
+    endTime,
+    existingId,
+  });
 
-  const ideaBoard = document.getElementById("ideaBoard");
-  if (!ideaBoard) {
-    console.error("❌ ideaBoard要素が見つかりません");
-    return;
+  const ideaData = {
+    title,
+    description,
+    type,
+    day,
+    id: existingId || Date.now(),
+    startTime,
+    duration,
+    endTime,
+  };
+  const existingIndex = appState.ideas.findIndex((idea) => idea.id === ideaData.id);
+  if (existingIndex >= 0) {
+    appState.ideas[existingIndex] = ideaData;
+  } else {
+    appState.ideas.push(ideaData);
   }
 
-  const card = document.createElement("div");
-  card.className = "idea-card";
-
-  const typeEmoji = { food: "🍜", sightseeing: "🏔️", hotel: "🏨", transport: "🚗" };
-  const typeLabel = { food: "グルメ", sightseeing: "観光", hotel: "宿泊", transport: "交通" };
-
-  const ideaData = { title, description, type, day, id: Date.now(), startTime, duration, endTime };
-  appState.ideas.push(ideaData);
-
-  let timeInfoHTML = '';
-  if (startTime || duration || endTime) {
-    timeInfoHTML = `
-      <div class="idea-time-info">
-        ${startTime ? `<span>開始: ${startTime}</span>` : ''}
-        ${duration ? `<span>所要: ${duration}</span>` : ''}
-        ${endTime ? `<span>終了: ${endTime}</span>` : ''}
-      </div>
-    `;
+  const card = typeof window.renderIdeaCard === "function" ? window.renderIdeaCard(ideaData) : null;
+  if (!card) {
+    console.warn("⚠️ アイデアカードの描画に失敗しました");
   }
-
-  card.innerHTML = `
-        <h3>${typeEmoji[type]} ${title}</h3>
-        <p>${description}</p>
-        ${timeInfoHTML}
-        <div class="idea-tags">
-            <span class="tag">${typeLabel[type]}</span>
-            ${day !== "0" ? `<span class="tag">${day}日目</span>` : ""}
-        </div>
-    `;
-
-  ideaBoard.appendChild(card);
-  console.log("✅ アイデアカードを画面に追加しました");
 
   // WebRTC同期の詳細チェック
   console.log("🔍 WebRTC同期チェック開始");
@@ -379,61 +345,6 @@ function addIdeaCard(title, description, type, day, fromRemote = false, startTim
       condition: `!${fromRemote} && ${collaborationEnabled} && ${!!window.webRTCManager}`,
     });
   }
-}
-
-// ビュー切り替え
-function switchView(viewName) {
-  // ビューの切り替え
-  document.querySelectorAll(".view").forEach((view) => {
-    view.classList.remove("active");
-  });
-  document.getElementById(`${viewName}-view`).classList.add("active");
-
-  // ナビゲーションボタンのアクティブ状態を更新
-  document.querySelectorAll(".nav-button").forEach((btn) => {
-    btn.classList.remove("active");
-  });
-  document.querySelector(`[data-view="${viewName}"]`).classList.add("active");
-
-  appState.currentView = viewName;
-
-  // マップビューの場合、マップを初期化
-  if (viewName === "map") {
-    initMap();
-  }
-
-  // フローチャートビューの場合、フローチャートを更新
-  if (viewName === "flowchart") {
-    updateFlowchart();
-  }
-}
-
-// モーダルの開閉
-function openModal() {
-  document.getElementById("modal").classList.add("active");
-}
-function closeModal() {
-  document.getElementById("modal").classList.remove("active");
-  document.getElementById("addForm").reset();
-  document.getElementById("itemLocation").value = "";
-  selectedPlace = null;
-}
-
-// 通知の表示
-function showNotification(message, type = "info", duration = 3000) {
-  const notification = document.createElement("div");
-  notification.className = `notification ${type}`;
-  notification.textContent = message;
-  document.body.appendChild(notification);
-  setTimeout(() => {
-    notification.style.opacity = "0";
-    setTimeout(() => {
-      if (document.body.contains(notification)) {
-        document.body.removeChild(notification);
-      }
-    }, 300);
-  }, duration);
-  return notification;
 }
 
 // フォーム送信処理
@@ -679,64 +590,6 @@ function centerMap() {
   showNotification("現在地を中心に表示しました", "info");
 }
 
-// ドラッグ&ドロップの実装
-let draggedElement = null;
-
-document.addEventListener("DOMContentLoaded", function () {
-  const timelineItems = document.querySelectorAll(".timeline-item");
-  timelineItems.forEach((item) => {
-    item.addEventListener("dragstart", handleDragStart);
-    item.addEventListener("dragover", handleDragOver);
-    item.addEventListener("drop", handleDrop);
-    item.addEventListener("dragend", handleDragEnd);
-  });
-  const ideaCards = document.querySelectorAll(".idea-card");
-  ideaCards.forEach((card) => {
-    card.draggable = true;
-    card.addEventListener("dragstart", handleDragStart);
-    card.addEventListener("dragover", handleDragOver);
-    card.addEventListener("drop", handleDrop);
-    card.addEventListener("dragend", handleDragEnd);
-  });
-});
-
-function handleDragStart(e) {
-  draggedElement = this;
-  this.classList.add("dragging");
-  e.dataTransfer.effectAllowed = "move";
-}
-function handleDragOver(e) {
-  if (e.preventDefault) e.preventDefault();
-  e.dataTransfer.dropEffect = "move";
-  const afterElement = getDragAfterElement(e.currentTarget.parentElement, e.clientY);
-  if (afterElement == null) e.currentTarget.parentElement.appendChild(draggedElement);
-  else e.currentTarget.parentElement.insertBefore(draggedElement, afterElement);
-  return false;
-}
-function handleDrop(e) {
-  if (e.stopPropagation) e.stopPropagation();
-  if (this.classList.contains("timeline-item")) updateTimelineTime();
-  return false;
-}
-function handleDragEnd(e) {
-  this.classList.remove("dragging");
-  draggedElement = null;
-}
-function getDragAfterElement(container, y) {
-  const draggableElements = [
-    ...container.querySelectorAll(".timeline-item:not(.dragging), .idea-card:not(.dragging)"),
-  ];
-  return draggableElements.reduce(
-    (closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
-      else return closest;
-    },
-    { offset: Number.NEGATIVE_INFINITY }
-  ).element;
-}
-
 // タイムラインの時間を自動調整
 function updateTimelineTime() {
   const timelineItems = document.querySelectorAll(".timeline-item");
@@ -910,7 +763,7 @@ function parseDurationToMinutes(durationStr) {
   if (minMatch) totalMinutes += parseInt(minMatch[1]);
   if (hMatch) totalMinutes += parseInt(hMatch[1]) * 60;
   if (mMatch) totalMinutes += parseInt(mMatch[1]);
-  
+
   // 数字のみの場合、分として解釈
   if (!hourMatch && !minMatch && !hMatch && !mMatch && !isNaN(parseInt(durationStr))) {
     totalMinutes = parseInt(durationStr);
@@ -987,7 +840,17 @@ function refreshUI() {
   const ideaBoard = document.getElementById("ideaBoard");
   ideaBoard.innerHTML = "";
   appState.ideas.forEach((idea) => {
-    addIdeaCard(idea.title, idea.description, idea.type, idea.day, false, idea.startTime, idea.duration, idea.endTime);
+    addIdeaCard(
+      idea.title,
+      idea.description,
+      idea.type,
+      idea.day,
+      true,
+      idea.startTime,
+      idea.duration,
+      idea.endTime,
+      idea.id
+    );
   });
   const timeline = document.getElementById("timeline");
   timeline.innerHTML = "";
@@ -1001,10 +864,10 @@ function updateFlowchart() {
   timeline.innerHTML = ""; // タイムラインをクリア
 
   const timedIdeas = appState.ideas
-    .filter(idea => idea.startTime)
+    .filter((idea) => idea.startTime)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  timedIdeas.forEach(idea => {
+  timedIdeas.forEach((idea) => {
     addTimelineItem(idea);
   });
 }
