@@ -717,30 +717,5 @@ function addTimelineItem(idea) {
   timeline.appendChild(timelineItem);
 }
 
-// キーボードショートカット
-document.addEventListener("keydown", function (e) {
-  if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-    e.preventDefault();
-    exportTripPlan();
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key === "n") {
-    e.preventDefault();
-    openModal();
-  }
-  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-    switch (e.key) {
-      case "1":
-        switchView("idea");
-        break;
-      case "2":
-        switchView("map");
-        break;
-      case "3":
-        switchView("flowchart");
-        break;
-    }
-  }
-});
-
 console.log("🗺️ 旅行プランナーを初期化しています...");
 console.log("Discord Activity として動作可能です");
