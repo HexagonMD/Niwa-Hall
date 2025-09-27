@@ -125,6 +125,9 @@ function createMarker(pinData) {
     title: pinData.title || pinData.name || "場所",
   });
 
+  marker.pinId = pinData.id;
+  marker.pinData = { ...pinData };
+
   marker.addListener("dblclick", () => {
     if (typeof openEditModalForPin === "function") {
       openEditModalForPin(pinData);
@@ -165,20 +168,35 @@ function createMarker(pinData) {
 function addMarker(pinData, center = false, fromRemote = false) {
   if (!map) return;
 
-  const marker = createMarker(pinData);
-  mapMarkers.push(marker);
-
+  const markerId = pinData.id || Date.now();
   const markerData = {
+    id: markerId,
     lat: Number(pinData.lat),
     lng: Number(pinData.lng),
     title: pinData.title || pinData.name || "場所",
-    id: pinData.id || Date.now(),
+    address: pinData.address || "",
   };
 
-  // appStateにピンが存在しない場合のみ追加
-  if (!appState.pins.find((p) => p.id === markerData.id)) {
+  // 既存マーカーを削除
+  const existingMarkerIndex = mapMarkers.findIndex((marker) => marker.pinId === markerId);
+  if (existingMarkerIndex > -1) {
+    mapMarkers[existingMarkerIndex].setMap(null);
+    mapMarkers.splice(existingMarkerIndex, 1);
+  }
+
+  // appStateを更新
+  const existingPinIndex = appState.pins.findIndex((p) => p.id === markerId);
+  if (existingPinIndex > -1) {
+    appState.pins[existingPinIndex] = {
+      ...appState.pins[existingPinIndex],
+      ...markerData,
+    };
+  } else {
     appState.pins.push(markerData);
   }
+
+  const marker = createMarker(markerData);
+  mapMarkers.push(marker);
 
   // WebRTC同期（リモートからの変更でなければ送信）
   if (!fromRemote && window.collaborationEnabled && window.webRTCManager) {

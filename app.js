@@ -62,8 +62,7 @@ async function initWebRTC() {
       // マーカーを追加
       addMarker(data, true, true);
 
-      // 対応するアイデアカードも作成
-      const ideaData = {
+      const fallbackIdea = {
         id: data.id,
         title: data.title || data.name || "共有されたスポット",
         description: data.address || `座標: ${data.lat}, ${data.lng}`,
@@ -71,20 +70,45 @@ async function initWebRTC() {
         day: "0",
       };
 
-      // アイデアカードを追加（fromRemote=true で再送信を防ぐ）
-      addIdeaCard(
-        ideaData.title,
-        ideaData.description,
-        ideaData.type,
-        ideaData.day,
-        true, // fromRemote=true
-        undefined, // startTime
-        undefined, // duration
-        undefined, // endTime
-        ideaData.id
-      );
+      const existingIdea = appState.ideas.find((idea) => idea.id === data.id);
+      const isNewIdea = !existingIdea;
 
-      showNotification("新しいスポットが共有されました", "success");
+      if (existingIdea) {
+        const mergedIdea = {
+          ...existingIdea,
+          title: fallbackIdea.title || existingIdea.title,
+          description: existingIdea.description || fallbackIdea.description,
+        };
+
+        addIdeaCard(
+          mergedIdea.title,
+          mergedIdea.description,
+          mergedIdea.type,
+          mergedIdea.day,
+          true,
+          mergedIdea.startTime,
+          mergedIdea.duration,
+          mergedIdea.endTime,
+          mergedIdea.id,
+          mergedIdea.photos || []
+        );
+      } else {
+        addIdeaCard(
+          fallbackIdea.title,
+          fallbackIdea.description,
+          fallbackIdea.type,
+          fallbackIdea.day,
+          true,
+          undefined,
+          undefined,
+          undefined,
+          fallbackIdea.id
+        );
+      }
+
+      if (isNewIdea) {
+        showNotification("新しいスポットが共有されました", "success");
+      }
     });
 
     window.webRTCManager.on("userJoined", (user) => {
@@ -343,7 +367,18 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
     }
 
     renderAllMarkers();
-    renderIdeaCard(appState.ideas[ideaIndex]);
+    const updatedIdea = appState.ideas[ideaIndex];
+    renderIdeaCard(updatedIdea);
+
+    if (collaborationEnabled && window.webRTCManager) {
+      if (updatedIdea) {
+        window.webRTCManager.sendIdea(updatedIdea);
+      }
+      if (pinIndex > -1 && appState.pins[pinIndex]) {
+        window.webRTCManager.sendMarker(appState.pins[pinIndex]);
+      }
+    }
+
     showNotification(`「${title}」を更新しました`, "success");
   } else {
     // This block might be deprecated now, but we'll leave it for now.
