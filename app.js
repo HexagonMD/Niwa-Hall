@@ -342,6 +342,18 @@ function renderPhotoPreviews() {
     currentEditingPhotos.forEach(photoSrc => {
         const img = document.createElement('img');
         img.src = photoSrc;
+
+        img.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (confirm("この写真を削除しますか？")) {
+                const index = currentEditingPhotos.indexOf(photoSrc);
+                if (index > -1) {
+                    currentEditingPhotos.splice(index, 1);
+                }
+                renderPhotoPreviews(); // プレビューを再描画
+            }
+        });
+
         previewContainer.appendChild(img);
     });
 }
