@@ -69,14 +69,14 @@ async function initMap() {
 
   map = new google.maps.Map(mapDiv, { center: { lat: 35.681236, lng: 139.767125 }, zoom: 12 });
   photoInfoWindow = new google.maps.InfoWindow();
-  photoInfoWindow.addListener('closeclick', () => {
-      hidePhotoPreview();
+  photoInfoWindow.addListener("closeclick", () => {
+    hidePhotoPreview();
   });
 
-  map.addListener('dblclick', (e) => {
-      if (typeof createPinAndIdeaFromLatLng === 'function') {
-          createPinAndIdeaFromLatLng(e.latLng);
-      }
+  map.addListener("dblclick", (e) => {
+    if (typeof createPinAndIdeaFromLatLng === "function") {
+      createPinAndIdeaFromLatLng(e.latLng);
+    }
   });
 
   appState.pins.forEach((p) => addMarker(p));
@@ -84,18 +84,18 @@ async function initMap() {
   // 場所検索オートコンプリートの初期化
   const locationInput = document.getElementById("itemLocation");
   if (locationInput) {
-      autocomplete = new google.maps.places.Autocomplete(locationInput, {
-        fields: ["name", "geometry", "website"],
-      });
+    autocomplete = new google.maps.places.Autocomplete(locationInput, {
+      fields: ["name", "geometry", "website"],
+    });
 
-      autocomplete.addListener("place_changed", () => {
-        selectedPlace = autocomplete.getPlace();
-        if (selectedPlace) {
-          // 場所の情報をフォームに自動入力
-          document.getElementById("itemTitle").value = selectedPlace.name || "";
-          document.getElementById("itemUrl").value = selectedPlace.website || "";
-        }
-      });
+    autocomplete.addListener("place_changed", () => {
+      selectedPlace = autocomplete.getPlace();
+      if (selectedPlace) {
+        // 場所の情報をフォームに自動入力
+        document.getElementById("itemTitle").value = selectedPlace.name || "";
+        document.getElementById("itemUrl").value = selectedPlace.website || "";
+      }
+    });
   }
 
   // マップビューの検索バーの初期化
@@ -107,7 +107,7 @@ async function initMap() {
   mapAutocomplete.addListener("place_changed", () => {
     const place = mapAutocomplete.getPlace();
     if (place.geometry) {
-      if (typeof createPinAndIdeaFromPlace === 'function') {
+      if (typeof createPinAndIdeaFromPlace === "function") {
         createPinAndIdeaFromPlace(place);
       }
       mapSearchInput.value = ""; // 入力欄をクリア
@@ -118,70 +118,88 @@ async function initMap() {
 }
 
 function createMarker(pinData) {
-    const position = { lat: Number(pinData.lat), lng: Number(pinData.lng) };
-    const marker = new google.maps.Marker({
-        position,
-        map,
-        title: pinData.title || pinData.name || "場所",
-    });
+  const position = { lat: Number(pinData.lat), lng: Number(pinData.lng) };
+  const marker = new google.maps.Marker({
+    position,
+    map,
+    title: pinData.title || pinData.name || "場所",
+  });
 
-    marker.addListener('dblclick', () => {
-        if (typeof openEditModalForPin === 'function') {
-            openEditModalForPin(pinData);
-        }
-    });
+  marker.pinId = pinData.id;
+  marker.pinData = { ...pinData };
 
-    marker.addListener('mouseover', () => {
-        if (!isInfoWindowPinned) {
-            showPhotoPreview(pinData, marker);
-        }
-    });
+  marker.addListener("dblclick", () => {
+    if (typeof openEditModalForPin === "function") {
+      openEditModalForPin(pinData);
+    }
+  });
 
-    marker.addListener('click', () => {
-        if (isInfoWindowPinned && pinnedMarker === marker) {
-            hidePhotoPreview();
-        } else {
-            showPhotoPreview(pinData, marker, true); // true to pin
-        }
-    });
+  marker.addListener("mouseover", () => {
+    if (!isInfoWindowPinned) {
+      showPhotoPreview(pinData, marker);
+    }
+  });
 
-    marker.addListener('mouseout', () => {
-        if (!isInfoWindowPinned) {
-            hidePhotoPreview();
-        }
-    });
+  marker.addListener("click", () => {
+    if (isInfoWindowPinned && pinnedMarker === marker) {
+      hidePhotoPreview();
+    } else {
+      showPhotoPreview(pinData, marker, true); // true to pin
+    }
+  });
 
-    marker.addListener('rightclick', (e) => {
-        if (confirm("このピンを消去しますか？")) {
-            if (typeof deletePinAndIdea === 'function') {
-                deletePinAndIdea(pinData);
-            }
-        }
-    });
+  marker.addListener("mouseout", () => {
+    if (!isInfoWindowPinned) {
+      hidePhotoPreview();
+    }
+  });
 
-    return marker;
+  marker.addListener("rightclick", (e) => {
+    if (confirm("このピンを消去しますか？")) {
+      if (typeof deletePinAndIdea === "function") {
+        deletePinAndIdea(pinData);
+      }
+    }
+  });
+
+  return marker;
 }
 
 function addMarker(pinData, center = false, fromRemote = false) {
   if (!map) return;
-  
-  const marker = createMarker(pinData);
-  mapMarkers.push(marker);
 
+  const markerId = pinData.id || Date.now();
   const markerData = {
+    id: markerId,
     lat: Number(pinData.lat),
     lng: Number(pinData.lng),
     title: pinData.title || pinData.name || "場所",
-    id: pinData.id || Date.now(),
+    address: pinData.address || "",
   };
 
-  // appStateにピンが存在しない場合のみ追加
-  if (!appState.pins.find(p => p.id === markerData.id)) {
+  // 既存マーカーを削除
+  const existingMarkerIndex = mapMarkers.findIndex((marker) => marker.pinId === markerId);
+  if (existingMarkerIndex > -1) {
+    mapMarkers[existingMarkerIndex].setMap(null);
+    mapMarkers.splice(existingMarkerIndex, 1);
+  }
+
+  // appStateを更新
+  const existingPinIndex = appState.pins.findIndex((p) => p.id === markerId);
+  if (existingPinIndex > -1) {
+    appState.pins[existingPinIndex] = {
+      ...appState.pins[existingPinIndex],
+      ...markerData,
+    };
+  } else {
     appState.pins.push(markerData);
   }
 
+  const marker = createMarker(markerData);
+  mapMarkers.push(marker);
+
   // WebRTC同期（リモートからの変更でなければ送信）
-  if (!fromRemote && collaborationEnabled && window.webRTCManager) {
+  if (!fromRemote && window.collaborationEnabled && window.webRTCManager) {
     window.webRTCManager.sendMarker(markerData);
   }
 
@@ -190,59 +208,62 @@ function addMarker(pinData, center = false, fromRemote = false) {
 
 function renderAllMarkers() {
   // 全てのマーカーをクリア
-  mapMarkers.forEach(marker => marker.setMap(null));
+  mapMarkers.forEach((marker) => marker.setMap(null));
   mapMarkers = [];
 
   // appState.pinsからマーカーを再描画
-  appState.pins.forEach(pin => {
+  appState.pins.forEach((pin) => {
     const marker = createMarker(pin);
     mapMarkers.push(marker);
   });
 }
 
 function showPhotoPreview(pinData, marker, pin = false) {
-    hidePhotoPreview(); // 既存のプレビューを閉じる
+  hidePhotoPreview(); // 既存のプレビューを閉じる
 
-    if (pin) {
-        isInfoWindowPinned = true;
-        pinnedMarker = marker;
-    }
+  if (pin) {
+    isInfoWindowPinned = true;
+    pinnedMarker = marker;
+  }
 
-    const idea = appState.ideas.find(i => i.id === pinData.id);
-    if (!idea || !idea.photos || idea.photos.length === 0) {
-        photoInfoWindow.setContent(`<div style="min-width:150px"><strong>${pinData.title || pinData.name}</strong><br>写真はありません</div>`);
-        photoInfoWindow.open(map, marker);
-        return;
-    }
-
-    let currentIndex = 0;
-    const contentDiv = document.createElement('div');
-    contentDiv.style.width = '200px';
-    contentDiv.style.height = '200px';
-    contentDiv.innerHTML = `<img src="${idea.photos[currentIndex]}" style="width:100%;height:100%;object-fit:cover;">`;
-    photoInfoWindow.setContent(contentDiv);
+  const idea = appState.ideas.find((i) => i.id === pinData.id);
+  if (!idea || !idea.photos || idea.photos.length === 0) {
+    photoInfoWindow.setContent(
+      `<div style="min-width:150px"><strong>${
+        pinData.title || pinData.name
+      }</strong><br>写真はありません</div>`
+    );
     photoInfoWindow.open(map, marker);
+    return;
+  }
 
-    if (idea.photos.length > 1) {
-        slideshowInterval = setInterval(() => {
-            currentIndex = (currentIndex + 1) % idea.photos.length;
-            contentDiv.innerHTML = `<img src="${idea.photos[currentIndex]}" style="width:100%;height:100%;object-fit:cover;">`;
-        }, 2000);
-    }
+  let currentIndex = 0;
+  const contentDiv = document.createElement("div");
+  contentDiv.style.width = "200px";
+  contentDiv.style.height = "200px";
+  contentDiv.innerHTML = `<img src="${idea.photos[currentIndex]}" style="width:100%;height:100%;object-fit:cover;">`;
+  photoInfoWindow.setContent(contentDiv);
+  photoInfoWindow.open(map, marker);
+
+  if (idea.photos.length > 1) {
+    slideshowInterval = setInterval(() => {
+      currentIndex = (currentIndex + 1) % idea.photos.length;
+      contentDiv.innerHTML = `<img src="${idea.photos[currentIndex]}" style="width:100%;height:100%;object-fit:cover;">`;
+    }, 2000);
+  }
 }
 
 function hidePhotoPreview() {
-    if (slideshowInterval) {
-        clearInterval(slideshowInterval);
-        slideshowInterval = null;
-    }
-    if (photoInfoWindow) {
-        photoInfoWindow.close();
-    }
-    isInfoWindowPinned = false;
-    pinnedMarker = null;
+  if (slideshowInterval) {
+    clearInterval(slideshowInterval);
+    slideshowInterval = null;
+  }
+  if (photoInfoWindow) {
+    photoInfoWindow.close();
+  }
+  isInfoWindowPinned = false;
+  pinnedMarker = null;
 }
-
 
 // タイムラインの時間を自動調整
 function updateTimelineTime() {

@@ -3,6 +3,7 @@ let selectedPlace = null;
 let autocomplete;
 let editingPinId = null; // 編集中のピンのIDを保持
 let currentEditingPhotos = []; // 編集中の写真リスト
+let collaborationEnabled = false; // 協働機能の状態
 
 // アプリの状態管理
 let appState = {
@@ -57,7 +58,57 @@ async function initWebRTC() {
 
     window.webRTCManager.on("markerReceived", (data) => {
       console.log("📍 マーカー受信:", data);
-      addMapMarker(data.lat, data.lng, data.title, true);
+
+      // マーカーを追加
+      addMarker(data, true, true);
+
+      const fallbackIdea = {
+        id: data.id,
+        title: data.title || data.name || "共有されたスポット",
+        description: data.address || `座標: ${data.lat}, ${data.lng}`,
+        type: "sightseeing",
+        day: "0",
+      };
+
+      const existingIdea = appState.ideas.find((idea) => idea.id === data.id);
+      const isNewIdea = !existingIdea;
+
+      if (existingIdea) {
+        const mergedIdea = {
+          ...existingIdea,
+          title: fallbackIdea.title || existingIdea.title,
+          description: existingIdea.description || fallbackIdea.description,
+        };
+
+        addIdeaCard(
+          mergedIdea.title,
+          mergedIdea.description,
+          mergedIdea.type,
+          mergedIdea.day,
+          true,
+          mergedIdea.startTime,
+          mergedIdea.duration,
+          mergedIdea.endTime,
+          mergedIdea.id,
+          mergedIdea.photos || []
+        );
+      } else {
+        addIdeaCard(
+          fallbackIdea.title,
+          fallbackIdea.description,
+          fallbackIdea.type,
+          fallbackIdea.day,
+          true,
+          undefined,
+          undefined,
+          undefined,
+          fallbackIdea.id
+        );
+      }
+
+      if (isNewIdea) {
+        showNotification("新しいスポットが共有されました", "success");
+      }
     });
 
     window.webRTCManager.on("userJoined", (user) => {
@@ -71,6 +122,7 @@ async function initWebRTC() {
     });
 
     window.webRTCManager.on("roomJoined", (roomId) => {
+      collaborationEnabled = true;
       window.collaborationEnabled = true;
       appState.roomId = roomId;
       console.log("🎯 ルーム参加完了、協働機能有効化:", { roomId, collaborationEnabled });
@@ -79,6 +131,7 @@ async function initWebRTC() {
     });
 
     window.webRTCManager.on("roomLeft", () => {
+      collaborationEnabled = false;
       window.collaborationEnabled = false;
       appState.roomId = null;
       updateUserList();
@@ -125,6 +178,7 @@ function leaveCollaboration() {
   if (window.webRTCManager && appState.roomId) {
     window.webRTCManager.leaveRoom();
     appState.roomId = null;
+    collaborationEnabled = false;
     window.collaborationEnabled = false;
     showNotification("協働セッションから退出しました", "info");
   }
@@ -269,6 +323,11 @@ function addIdeaCard(
       condition: `!${fromRemote} && ${collaborationEnabled} && ${!!window.webRTCManager}`,
     });
   }
+
+  // フローチャートを更新
+  if (typeof updateFlowchart === "function") {
+    updateFlowchart();
+  }
 }
 
 // フォーム送信処理
@@ -287,12 +346,12 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
 
   if (editingPinId) {
     // --- 編集モード ---
-    const pinIndex = appState.pins.findIndex(p => p.id === editingPinId);
+    const pinIndex = appState.pins.findIndex((p) => p.id === editingPinId);
     if (pinIndex > -1) {
       appState.pins[pinIndex].title = title;
     }
 
-    const ideaIndex = appState.ideas.findIndex(i => i.id === editingPinId);
+    const ideaIndex = appState.ideas.findIndex((i) => i.id === editingPinId);
     if (ideaIndex > -1) {
       appState.ideas[ideaIndex] = {
         ...appState.ideas[ideaIndex],
@@ -308,13 +367,34 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
     }
 
     renderAllMarkers();
-    renderIdeaCard(appState.ideas[ideaIndex]);
-    showNotification(`「${title}」を更新しました`, "success");
+    const updatedIdea = appState.ideas[ideaIndex];
+    renderIdeaCard(updatedIdea);
 
+    if (collaborationEnabled && window.webRTCManager) {
+      if (updatedIdea) {
+        window.webRTCManager.sendIdea(updatedIdea);
+      }
+      if (pinIndex > -1 && appState.pins[pinIndex]) {
+        window.webRTCManager.sendMarker(appState.pins[pinIndex]);
+      }
+    }
+
+    showNotification(`「${title}」を更新しました`, "success");
   } else {
     // This block might be deprecated now, but we'll leave it for now.
     const newId = Date.now();
-    addIdeaCard(title, description, pinType, day, false, startTime, duration, endTime, newId, photos);
+    addIdeaCard(
+      title,
+      description,
+      pinType,
+      day,
+      false,
+      startTime,
+      duration,
+      endTime,
+      newId,
+      photos
+    );
 
     if (clickedLatLng) {
       const data = { id: newId, title: title, lat: clickedLatLng.lat, lng: clickedLatLng.lng };
@@ -337,46 +417,46 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
 });
 
 function renderPhotoPreviews() {
-    const previewContainer = document.getElementById('photoPreviews');
-    previewContainer.innerHTML = '';
-    currentEditingPhotos.forEach(photoSrc => {
-        const img = document.createElement('img');
-        img.src = photoSrc;
+  const previewContainer = document.getElementById("photoPreviews");
+  previewContainer.innerHTML = "";
+  currentEditingPhotos.forEach((photoSrc) => {
+    const img = document.createElement("img");
+    img.src = photoSrc;
 
-        img.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (confirm("この写真を削除しますか？")) {
-                const index = currentEditingPhotos.indexOf(photoSrc);
-                if (index > -1) {
-                    currentEditingPhotos.splice(index, 1);
-                }
-                renderPhotoPreviews(); // プレビューを再描画
-            }
-        });
-
-        previewContainer.appendChild(img);
+    img.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (confirm("この写真を削除しますか？")) {
+        const index = currentEditingPhotos.indexOf(photoSrc);
+        if (index > -1) {
+          currentEditingPhotos.splice(index, 1);
+        }
+        renderPhotoPreviews(); // プレビューを再描画
+      }
     });
+
+    previewContainer.appendChild(img);
+  });
 }
 
 // 写真プレビューの処理
-document.getElementById('itemPhotos').addEventListener('change', function(event) {
+document.getElementById("itemPhotos").addEventListener("change", function (event) {
   const files = event.target.files;
   let filesToProcess = files.length;
 
   if (filesToProcess === 0) return;
 
   for (const file of files) {
-    if (!file.type.startsWith('image/')) {
-        filesToProcess--;
-        continue;
+    if (!file.type.startsWith("image/")) {
+      filesToProcess--;
+      continue;
     }
 
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
       currentEditingPhotos.push(e.target.result);
       filesToProcess--;
       if (filesToProcess === 0) {
-          renderPhotoPreviews();
+        renderPhotoPreviews();
       }
     };
     reader.readAsDataURL(file);
@@ -385,26 +465,28 @@ document.getElementById('itemPhotos').addEventListener('change', function(event)
 
 function openEditModalForPin(pinData) {
   editingPinId = pinData.id;
-  const idea = appState.ideas.find(i => i.id === pinData.id);
+  const idea = appState.ideas.find((i) => i.id === pinData.id);
 
   // フォームの値を設定
-  document.getElementById("itemTitle").value = pinData.title || '';
+  document.getElementById("itemTitle").value = pinData.title || "";
   if (idea) {
-    document.getElementById("itemDescription").value = idea.description || '';
-    document.getElementById("itemUrl").value = idea.url || '';
-    document.getElementById("itemStartTime").value = idea.startTime || '';
-    document.getElementById("itemDuration").value = idea.duration || '';
-    document.getElementById("itemEndTime").value = idea.endTime || '';
-    document.querySelector(`input[name="pinType"][value="${idea.type || 'sightseeing'}"]`).checked = true;
-    document.getElementById("itemDay").value = idea.day || '0';
-    
+    document.getElementById("itemDescription").value = idea.description || "";
+    document.getElementById("itemUrl").value = idea.url || "";
+    document.getElementById("itemStartTime").value = idea.startTime || "";
+    document.getElementById("itemDuration").value = idea.duration || "";
+    document.getElementById("itemEndTime").value = idea.endTime || "";
+    document.querySelector(
+      `input[name="pinType"][value="${idea.type || "sightseeing"}"]`
+    ).checked = true;
+    document.getElementById("itemDay").value = idea.day || "0";
+
     // 写真データを一時配列にコピー
     currentEditingPhotos = idea.photos ? [...idea.photos] : [];
   } else {
     // ideaがない場合（ピンのみの場合）
     currentEditingPhotos = [];
   }
-  
+
   // 写真プレビューをレンダリング
   renderPhotoPreviews();
 
@@ -426,74 +508,99 @@ function createPinAndIdeaFromPlace(place) {
   const ideaData = {
     id: newId,
     title: place.name,
-    description: '',
-    type: 'sightseeing', // デフォルトのタイプ
-    day: '0', // デフォルトは未定
+    description: "",
+    type: "sightseeing", // デフォルトのタイプ
+    day: "0", // デフォルトは未定
   };
 
   // appStateに追加
   appState.pins.push(pinData);
   appState.ideas.push(ideaData);
 
-  // 地図にマーカーを追加
-  addMarker(pinData, true);
+  // 地図にマーカーを追加（WebRTC送信も含む）
+  addMarker(pinData, true, false); // fromRemote=false でWebRTC送信を有効化
 
-  // アイデアボードにカードを追加
-  renderIdeaCard(ideaData);
+  // アイデアボードにカードを追加（WebRTC送信も含む）
+  addIdeaCard(
+    ideaData.title,
+    ideaData.description,
+    ideaData.type,
+    ideaData.day,
+    false, // fromRemote=false
+    undefined, // startTime
+    undefined, // duration
+    undefined, // endTime
+    ideaData.id
+  );
 
-  showNotification(`「${place.name}」をマップとアイデアに追加しました。クリックして詳細を編集できます。`, "success", 5000);
+  showNotification(
+    `「${place.name}」をマップとアイデアに追加しました。クリックして詳細を編集できます。`,
+    "success",
+    5000
+  );
 }
 window.createPinAndIdeaFromPlace = createPinAndIdeaFromPlace;
 
 function deletePinAndIdea(pinData) {
-    // appState.pinsから削除
-    const pinIndex = appState.pins.findIndex(p => p.id === pinData.id);
-    if (pinIndex > -1) {
-        appState.pins.splice(pinIndex, 1);
-    }
+  // appState.pinsから削除
+  const pinIndex = appState.pins.findIndex((p) => p.id === pinData.id);
+  if (pinIndex > -1) {
+    appState.pins.splice(pinIndex, 1);
+  }
 
-    // appState.ideasから削除
-    const ideaIndex = appState.ideas.findIndex(i => i.id === pinData.id);
-    if (ideaIndex > -1) {
-        appState.ideas.splice(ideaIndex, 1);
-    }
+  // appState.ideasから削除
+  const ideaIndex = appState.ideas.findIndex((i) => i.id === pinData.id);
+  if (ideaIndex > -1) {
+    appState.ideas.splice(ideaIndex, 1);
+  }
 
-    // UIを更新
-    renderAllMarkers(); // マップを更新
-    removeIdeaCard(pinData.id); // アイデアカードを削除
+  // UIを更新
+  renderAllMarkers(); // マップを更新
+  removeIdeaCard(pinData.id); // アイデアカードを削除
 
-    showNotification(`「${pinData.title}」を削除しました`, "success");
+  showNotification(`「${pinData.title}」を削除しました`, "success");
 }
 window.deletePinAndIdea = deletePinAndIdea;
 
 function createPinAndIdeaFromLatLng(latLng) {
-    const newId = Date.now();
-    const title = "新しい場所";
+  const newId = Date.now();
+  const title = "新しい場所";
 
-    const pinData = {
-        id: newId,
-        title: title,
-        lat: latLng.lat(),
-        lng: latLng.lng(),
-    };
+  const pinData = {
+    id: newId,
+    title: title,
+    lat: latLng.lat(),
+    lng: latLng.lng(),
+  };
 
-    const ideaData = {
-        id: newId,
-        title: title,
-        description: "",
-        type: "sightseeing",
-        day: "0",
-        photos: [],
-    };
+  const ideaData = {
+    id: newId,
+    title: title,
+    description: "",
+    type: "sightseeing",
+    day: "0",
+    photos: [],
+  };
 
-    appState.pins.push(pinData);
-    appState.ideas.push(ideaData);
+  appState.pins.push(pinData);
+  appState.ideas.push(ideaData);
 
-    addMarker(pinData, false);
-    renderIdeaCard(ideaData);
+  addMarker(pinData, false, false); // fromRemote=false でWebRTC送信を有効化
+  addIdeaCard(
+    ideaData.title,
+    ideaData.description,
+    ideaData.type,
+    ideaData.day,
+    false, // fromRemote=false
+    undefined, // startTime
+    undefined, // duration
+    undefined, // endTime
+    ideaData.id,
+    ideaData.photos
+  );
 
-    // すぐに編集モーダルを開く
-    openEditModalForPin(pinData);
+  // すぐに編集モーダルを開く
+  openEditModalForPin(pinData);
 }
 window.createPinAndIdeaFromLatLng = createPinAndIdeaFromLatLng;
 
