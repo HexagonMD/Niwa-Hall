@@ -199,11 +199,11 @@ io.on("connection", (socket) => {
 
 // HTTP ルート
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "test.html"));
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 app.get("/room/:roomId", (req, res) => {
-  res.sendFile(path.join(__dirname, "test.html"));
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
 const PORT = process.env.PORT || 3000;
