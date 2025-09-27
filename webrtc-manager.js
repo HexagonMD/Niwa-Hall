@@ -7,8 +7,6 @@ class WebRTCManager {
     this.userId = this.generateUserId();
     this.userName = "";
     this.roomId = "";
-    this.isConnected = false;
-    this.isInitialized = false;
     this.eventListeners = new Map(); // イベントリスナー管理
     this.users = []; // 接続ユーザー管理（配列）
     this.iceCandidateQueue = new Map(); // userId -> RTCIceCandidate[]
@@ -76,8 +74,6 @@ class WebRTCManager {
 
         this.socket.on("connect", () => {
           console.log("✅ Connected to signaling server");
-          this.isConnected = true;
-          this.isInitialized = true;
 
           // WebRTCシグナリングイベントを設定
           this.setupSignalingHandlers();
@@ -87,17 +83,14 @@ class WebRTCManager {
 
         this.socket.on("connect_error", (error) => {
           console.error("❌ Failed to connect to server:", error);
-          this.isInitialized = false;
           reject(error);
         });
 
         this.socket.on("disconnect", () => {
           console.log("🔌 Disconnected from server");
-          this.isConnected = false;
         });
       } catch (error) {
         console.error("❌ WebRTC初期化エラー:", error);
-        this.isInitialized = false;
         reject(error);
       }
     });
@@ -106,28 +99,19 @@ class WebRTCManager {
   setupSignalingHandlers() {
     // 新しいユーザーが参加
     this.socket.on("user-joined", (data) => {
-      console.log(`👋 User joined: ${data.userName} (${data.userId})`);
-
-      // 既存のユーザーは、新しく参加したユーザーからの接続を待つため、
-      // ここで自らピア接続を開始する必要はありません。
-      // 新規参加者が 'room-state' を受信した際に、既存の全ユーザーへの接続を開始します。
-      // これにより、両者が同時に接続を開始しようとする競合状態（グレア）を防ぎます。
-
       this.updateUserList(data.users);
       this.emit("userJoined", { id: data.userId, name: data.userName });
     });
 
     // ユーザーが退出
     this.socket.on("user-left", (data) => {
-      console.log(`👋 User left: ${data.userId}`);
       this.closePeerConnection(data.userId);
       this.updateUserList(data.users);
-      this.emit("userLeft", data.userId);
+      this.emit("userLeft", { id: data.userId, name: data.userName });
     });
 
     // ルーム状態取得
     this.socket.on("room-state", (data) => {
-      console.log("📊 Room state received:", data);
       this.updateUserList(data.users);
       this.syncTripData(data.tripData);
 
@@ -169,19 +153,6 @@ class WebRTCManager {
     // カーソル更新
     this.socket.on("cursor-update", (data) => {
       this.updateRemoteCursor(data.userId, data.cursor);
-    });
-
-    // Socket.IO経由のデータ同期（WebRTC接続前のフォールバック）
-    this.socket.on("idea-added", (data) => {
-      // フォールバックは削除されたため、このイベントは使用されない
-    });
-
-    this.socket.on("marker-added", (data) => {
-      // フォールバックは削除されたため、このイベントは使用されない
-    });
-
-    this.socket.on("timeline-updated", (data) => {
-      // フォールバックは削除されたため、このイベントは使用されない
     });
   }
 
@@ -239,20 +210,11 @@ class WebRTCManager {
     console.log(`🔄 ピア接続作成試行: ${remoteUserId}`);
 
     // 自分自身への接続を防ぐ
-    if (remoteUserId === this.userId) {
-      console.log(`ℹ️ 自分自身への接続をスキップ: ${remoteUserId}`);
-      return;
-    }
+    if (remoteUserId === this.userId) return;
 
     // 既存の接続をチェック
     if (this.peerConnections.has(remoteUserId)) {
       const existingPeer = this.peerConnections.get(remoteUserId);
-      console.log(`⚠️ 既存接続あり ${remoteUserId}:`, {
-        connectionState: existingPeer.connectionState,
-        signalingState: existingPeer.signalingState,
-        hasRemoteDescription: !!existingPeer.remoteDescription,
-        hasLocalDescription: !!existingPeer.localDescription,
-      });
 
       // 使用可能な接続状態の場合はスキップ
       const usableStates = ["connected", "connecting"];
@@ -263,10 +225,6 @@ class WebRTCManager {
         usableStates.includes(existingPeer.connectionState) ||
         activeSignalingStates.includes(existingPeer.signalingState)
       ) {
-        console.log(
-          `ℹ️ 既存接続を確認: ${remoteUserId} (${existingPeer.connectionState}/${existingPeer.signalingState})`
-        );
-
         // stable状態でもデータチャンネルがない場合は作成を試行
         if (existingPeer.signalingState === "stable" && !this.dataChannels.has(remoteUserId)) {
           console.log(`🔧 stable状態でデータチャンネル不在、作成を試行: ${remoteUserId}`);
@@ -625,15 +583,9 @@ class WebRTCManager {
 
     console.log(`📊 送信完了: ${sentCount}/${this.dataChannels.size} 接続`);
 
-    // WebRTC送信が失敗した場合のフォールバックは削除
     if (sentCount < this.dataChannels.size) {
       console.warn(`一部のピアに送信できませんでした: ${sentCount}/${this.dataChannels.size}`);
     }
-  }
-
-  sendViaSocketIO(message) {
-    // この関数はフォールバック削除により使用されません
-    console.warn("sendViaSocketIO is deprecated and should not be called.");
   }
 
   handleWebRTCMessage(message, fromUserId) {
@@ -692,18 +644,6 @@ class WebRTCManager {
     if (window.syncTripData) {
       window.syncTripData(tripData);
     }
-  }
-
-  handleRemoteIdeaAdded(idea, fromUserId) {
-    // フォールバックは削除されたため、このイベントは使用されない
-  }
-
-  handleRemoteMarkerAdded(marker, fromUserId) {
-    // フォールバックは削除されたため、このイベントは使用されない
-  }
-
-  handleRemoteTimelineUpdated(timeline, fromUserId) {
-    // フォールバックは削除されたため、このイベントは使用されない
   }
 
   // 公開メソッド
