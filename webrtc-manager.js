@@ -170,19 +170,6 @@ class WebRTCManager {
     this.socket.on("cursor-update", (data) => {
       this.updateRemoteCursor(data.userId, data.cursor);
     });
-
-    // Socket.IO経由のデータ同期（WebRTC接続前のフォールバック）
-    this.socket.on("idea-added", (data) => {
-      // フォールバックは削除されたため、このイベントは使用されない
-    });
-
-    this.socket.on("marker-added", (data) => {
-      // フォールバックは削除されたため、このイベントは使用されない
-    });
-
-    this.socket.on("timeline-updated", (data) => {
-      // フォールバックは削除されたため、このイベントは使用されない
-    });
   }
 
   async joinRoom(roomId, userName = null) {
@@ -625,15 +612,9 @@ class WebRTCManager {
 
     console.log(`📊 送信完了: ${sentCount}/${this.dataChannels.size} 接続`);
 
-    // WebRTC送信が失敗した場合のフォールバックは削除
     if (sentCount < this.dataChannels.size) {
       console.warn(`一部のピアに送信できませんでした: ${sentCount}/${this.dataChannels.size}`);
     }
-  }
-
-  sendViaSocketIO(message) {
-    // この関数はフォールバック削除により使用されません
-    console.warn("sendViaSocketIO is deprecated and should not be called.");
   }
 
   handleWebRTCMessage(message, fromUserId) {
@@ -692,18 +673,6 @@ class WebRTCManager {
     if (window.syncTripData) {
       window.syncTripData(tripData);
     }
-  }
-
-  handleRemoteIdeaAdded(idea, fromUserId) {
-    // フォールバックは削除されたため、このイベントは使用されない
-  }
-
-  handleRemoteMarkerAdded(marker, fromUserId) {
-    // フォールバックは削除されたため、このイベントは使用されない
-  }
-
-  handleRemoteTimelineUpdated(timeline, fromUserId) {
-    // フォールバックは削除されたため、このイベントは使用されない
   }
 
   // 公開メソッド
