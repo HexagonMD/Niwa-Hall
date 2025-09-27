@@ -14,11 +14,6 @@ let appState = {
 
 // WebRTC Collaboration
 let collaborationEnabled = false;
-let currentUser = {
-  id: "user_" + Date.now(),
-  name: "ユーザー" + Math.floor(Math.random() * 100),
-  color: "#" + Math.floor(Math.random() * 16777215).toString(16),
-};
 
 // WebRTC Manager初期化
 async function initWebRTC() {
@@ -134,80 +129,6 @@ function leaveCollaboration() {
     showNotification("協働セッションから退出しました", "info");
   }
 }
-
-// デバッグ: 協働状態確認
-function debugCollaboration() {
-  console.log("🔍 協働状態デバッグ:");
-  console.log("collaborationEnabled:", collaborationEnabled);
-  console.log("appState.roomId:", appState.roomId);
-  console.log("webRTCManager存在:", !!window.webRTCManager);
-  if (window.webRTCManager) {
-    console.log("WebRTCManager詳細:", {
-      initialized: window.webRTCManager.isInitialized,
-      connected: window.webRTCManager.isConnected,
-      roomId: window.webRTCManager.roomId,
-      peers: window.webRTCManager.peerConnections?.size,
-      dataChannels: window.webRTCManager.dataChannels?.size,
-    });
-
-    // WebRTCManagerの詳細デバッグ
-    window.webRTCManager.debugConnections();
-  }
-}
-
-// WebRTC接続強制リセット（デバッグ用）
-function resetWebRTCConnection(userId) {
-  if (window.webRTCManager && userId) {
-    window.webRTCManager.forceResetConnection(userId);
-  } else {
-    console.log("❌ WebRTCManagerまたはuserIdが無効");
-  }
-}
-
-// データチャンネル強制作成（デバッグ用）
-function createDataChannel(userId) {
-  if (window.webRTCManager && userId) {
-    window.webRTCManager.forceCreateDataChannel(userId);
-  } else {
-    console.log("❌ WebRTCManagerまたはuserIdが無効");
-  }
-}
-
-// テスト用: 強制的にアイデアを送信
-function testSendIdea() {
-  const testIdea = {
-    title: "テストアイデア",
-    description: "これは同期テストです",
-    type: "food",
-    day: "1",
-    id: Date.now(),
-  };
-
-  console.log("🧪 テストアイデア送信:", testIdea);
-
-  if (window.webRTCManager && window.webRTCManager.sendIdea) {
-    window.webRTCManager.sendIdea(testIdea);
-    console.log("✅ 送信完了");
-  } else {
-    console.log("❌ WebRTCManager.sendIdea が利用できません");
-  }
-}
-
-// テスト用: 協働機能を強制有効化
-function forceEnableCollaboration() {
-  collaborationEnabled = true;
-  console.log("🔥 協働機能を強制有効化しました");
-  console.log("現在の状態:", {
-    collaborationEnabled,
-    webRTCManager: !!window.webRTCManager,
-    roomId: appState.roomId,
-  });
-}
-
-// グローバルからアクセス可能にする
-window.debugCollaboration = debugCollaboration;
-window.testSendIdea = testSendIdea;
-window.forceEnableCollaboration = forceEnableCollaboration;
 
 // 旅行データ同期関数（新規ユーザー入室時の既存データ表示用）
 function syncTripData(tripData) {
