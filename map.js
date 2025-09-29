@@ -206,13 +206,13 @@ function addMarker(pinData, center = false, fromRemote = false) {
   if (center) map.panTo(marker.getPosition());
 }
 
-function renderAllMarkers() {
+function renderAllMarkers(pinsToRender = appState.pins) {
   // 全てのマーカーをクリア
   mapMarkers.forEach((marker) => marker.setMap(null));
   mapMarkers = [];
 
-  // appState.pinsからマーカーを再描画
-  appState.pins.forEach((pin) => {
+  // 指定されたピン配列からマーカーを再描画
+  pinsToRender.forEach((pin) => {
     const marker = createMarker(pin);
     mapMarkers.push(marker);
   });

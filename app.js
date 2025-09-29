@@ -136,7 +136,8 @@ async function initWebRTC() {
       appState.roomId = null;
       updateUserList();
     });
-  } catch (error) {
+  }
+  catch (error) {
     console.error("❌ WebRTC初期化エラー:", error);
     showNotification("WebRTC初期化に失敗しました: " + error.message, "error");
   }
@@ -745,7 +746,67 @@ function formatMinutesToDuration(minutes) {
 }
 
 function filterPinsByDay(day) {
-  console.log(`Filtering pins for: ${day}`);
+  console.log(`--- Filtering for: ${day} ---`);
+  const trimmedDay = day.trim();
+
+  // Log initial state
+  console.log(
+    "Initial appState.ideas:",
+    JSON.parse(JSON.stringify(appState.ideas))
+  );
+  console.log(
+    "Initial appState.pins:",
+    JSON.parse(JSON.stringify(appState.pins))
+  );
+
+  let ideasToShow;
+
+  if (trimmedDay.includes("全日程")) {
+    console.log("Case: 'すべて' (All)");
+    ideasToShow = appState.ideas;
+  } else if (trimmedDay === "未定") {
+    console.log("Case: '未定' (Undecided)");
+    ideasToShow = appState.ideas.filter((idea) => idea.day === "0");
+  } else {
+    console.log(`Case: Day number`);
+    const dayNumberMatch = trimmedDay.match(/\d+/);
+    if (dayNumberMatch) {
+      const targetDay = dayNumberMatch[0];
+      console.log(`Target day number: ${targetDay}`);
+      ideasToShow = appState.ideas.filter((idea) => idea.day === targetDay);
+    } else {
+      console.log("Fallback: No day number found, showing nothing.");
+      ideasToShow = [];
+    }
+  }
+
+  console.log("ideasToShow:", JSON.parse(JSON.stringify(ideasToShow)));
+
+  const ideaIdsToShow = new Set(ideasToShow.map((idea) => idea.id));
+  const pinsToShow = appState.pins.filter((pin) => ideaIdsToShow.has(pin.id));
+
+  console.log("ideaIdsToShow:", Array.from(ideaIdsToShow));
+  console.log("pinsToShow:", JSON.parse(JSON.stringify(pinsToShow)));
+
+  // Re-render idea cards
+  const ideaBoard = document.getElementById("ideaBoard");
+  if (ideaBoard) {
+    console.log("Clearing ideaBoard.");
+    ideaBoard.innerHTML = ""; // Clear the board
+    console.log(`Rendering ${ideasToShow.length} idea cards.`);
+    ideasToShow.forEach((idea) => {
+      if (typeof window.renderIdeaCard === "function") {
+        window.renderIdeaCard(idea);
+      }
+    });
+  }
+
+  // Re-render map markers
+  if (typeof window.renderAllMarkers === "function") {
+    console.log(`Rendering ${pinsToShow.length} map markers.`);
+    window.renderAllMarkers(pinsToShow);
+  }
+  console.log("--- Filtering complete ---");
 }
 
 console.log("🗺️ 旅行プランナーを初期化しています...");
