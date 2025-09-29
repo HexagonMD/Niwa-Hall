@@ -14,6 +14,10 @@ let appState = {
   users: [],
   isHost: false,
   roomId: null,
+  bookmark: {
+    title: "旅行のしおり",
+    coverImage: null,
+  },
 };
 
 // WebRTC Manager初期化
@@ -233,6 +237,236 @@ function syncTripData(tripData) {
 window.syncTripData = syncTripData;
 
 // アイデアカードの追加（WebRTC対応版）
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function appendTextWithLineBreaks(element, text) {
+  const fragments = String(text).split(/\r?\n/);
+  fragments.forEach((fragment, index) => {
+    element.appendChild(document.createTextNode(fragment));
+    if (index < fragments.length - 1) {
+      element.appendChild(document.createElement("br"));
+    }
+  });
+}
+
+function updateBookmark() {
+  const pagesContainer = document.getElementById("bookmarkPages");
+  if (!pagesContainer) {
+    return;
+  }
+
+  const bookmarkState = appState.bookmark || { title: "", coverImage: null };
+  const title = (bookmarkState.title || "").trim() || "Trip Bookmark";
+
+  const titleInput = document.getElementById("bookmarkTitleInput");
+  if (titleInput && titleInput.value !== bookmarkState.title) {
+    titleInput.value = bookmarkState.title;
+  }
+
+  const coverPreview = document.getElementById("bookmarkCoverPreview");
+  if (coverPreview) {
+    coverPreview.innerHTML = "";
+    if (bookmarkState.coverImage) {
+      const img = document.createElement("img");
+      img.src = bookmarkState.coverImage;
+      img.alt = "Cover preview";
+      coverPreview.appendChild(img);
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.className = "bookmark-cover-placeholder";
+      placeholder.textContent = "No cover image";
+      coverPreview.appendChild(placeholder);
+    }
+  }
+
+  pagesContainer.innerHTML = "";
+
+  const coverPage = document.createElement("div");
+  coverPage.className = "bookmark-page bookmark-cover-page";
+  const coverInner = document.createElement("div");
+  coverInner.className = "bookmark-cover-inner";
+
+  const coverTitle = document.createElement("div");
+  coverTitle.className = "bookmark-cover-title";
+  coverTitle.textContent = title;
+  coverInner.appendChild(coverTitle);
+
+  if (bookmarkState.coverImage) {
+    const coverImage = document.createElement("div");
+    coverImage.className = "bookmark-cover-image";
+    const img = document.createElement("img");
+    img.src = bookmarkState.coverImage;
+    img.alt = `${title} cover`;
+    coverImage.appendChild(img);
+    coverInner.appendChild(coverImage);
+  } else {
+    const placeholder = document.createElement("div");
+    placeholder.className = "bookmark-cover-placeholder";
+    placeholder.textContent = "Add a cover image";
+    coverInner.appendChild(placeholder);
+  }
+
+  coverPage.appendChild(coverInner);
+  pagesContainer.appendChild(coverPage);
+
+  const ideasByDay = new Map();
+
+  appState.ideas.forEach((idea) => {
+    if (!idea || !idea.day || idea.day === "0") {
+      return;
+    }
+    if (!ideasByDay.has(idea.day)) {
+      ideasByDay.set(idea.day, []);
+    }
+    ideasByDay.get(idea.day).push(idea);
+  });
+
+  const dayKeys = Array.from(ideasByDay.keys()).sort((a, b) => Number(a) - Number(b));
+
+  if (dayKeys.length === 0) {
+    const emptyPage = document.createElement("div");
+    emptyPage.className = "bookmark-page bookmark-empty-page";
+    const emptyMessage = document.createElement("div");
+    emptyMessage.className = "bookmark-empty";
+    emptyMessage.textContent = "登録されている場所がありません";
+    emptyPage.appendChild(emptyMessage);
+    pagesContainer.appendChild(emptyPage);
+  } else {
+    const typeLabels = {
+      food: "Food",
+      sightseeing: "Sightseeing",
+      hotel: "Stay",
+      transport: "Transport",
+      default: "Other",
+    };
+
+    dayKeys.forEach((dayKey) => {
+      const ideas = ideasByDay
+        .get(dayKey)
+        .slice()
+        .sort((a, b) => {
+          const aTime = a.startTime || "";
+          const bTime = b.startTime || "";
+          if (aTime && bTime) return aTime.localeCompare(bTime);
+          if (aTime) return -1;
+          if (bTime) return 1;
+          return (a.title || "").localeCompare(b.title || "");
+        });
+
+      const page = document.createElement("div");
+      page.className = "bookmark-page bookmark-day-page";
+
+      const header = document.createElement("div");
+      header.className = "bookmark-day-header";
+
+      const label = document.createElement("div");
+      label.className = "bookmark-day-label";
+      label.textContent = `Day ${dayKey}`;
+      header.appendChild(label);
+
+      const summary = document.createElement("div");
+      summary.className = "bookmark-day-summary";
+      summary.textContent = `${ideas.length} spot${ideas.length === 1 ? "" : "s"}`;
+      header.appendChild(summary);
+
+      page.appendChild(header);
+
+      const timeline = document.createElement("div");
+      timeline.className = "bookmark-timeline";
+
+      if (ideas.length === 0) {
+        const emptyMessage = document.createElement("div");
+        emptyMessage.className = "bookmark-empty";
+        emptyMessage.textContent = "No spots scheduled for this day.";
+        timeline.appendChild(emptyMessage);
+      } else {
+        ideas.forEach((idea) => {
+          const item = document.createElement("div");
+          item.className = "bookmark-timeline-item";
+
+          const timeColumn = document.createElement("div");
+          timeColumn.className = "bookmark-item-time";
+
+          const startSpan = document.createElement("span");
+          startSpan.className = "bookmark-time-start";
+          startSpan.textContent = idea.startTime || "--:--";
+          timeColumn.appendChild(startSpan);
+
+          if (idea.endTime) {
+            const endSpan = document.createElement("span");
+            endSpan.className = "bookmark-time-end";
+            endSpan.textContent = idea.endTime;
+            timeColumn.appendChild(endSpan);
+          }
+
+          const body = document.createElement("div");
+          body.className = "bookmark-item-body";
+
+          const titleEl = document.createElement("h4");
+          titleEl.className = "bookmark-item-title";
+          titleEl.textContent = idea.title || "Untitled spot";
+          body.appendChild(titleEl);
+
+          if (idea.description) {
+            const desc = document.createElement("p");
+            desc.className = "bookmark-item-desc";
+            appendTextWithLineBreaks(desc, idea.description);
+            body.appendChild(desc);
+          }
+
+          const metaParts = [];
+          const labelText = typeLabels[idea.type] || typeLabels.default;
+          if (labelText) {
+            metaParts.push(labelText);
+          }
+          if (idea.duration) {
+            metaParts.push(idea.duration);
+          }
+          if (metaParts.length) {
+            const meta = document.createElement("div");
+            meta.className = "bookmark-item-meta";
+            metaParts.forEach((part) => {
+              const span = document.createElement("span");
+              span.textContent = part;
+              meta.appendChild(span);
+            });
+            body.appendChild(meta);
+          }
+
+          if (idea.photos && idea.photos.length) {
+            const photoWrapper = document.createElement("div");
+            photoWrapper.className = "bookmark-item-photo";
+            const img = document.createElement("img");
+            img.src = idea.photos[0];
+            img.alt = `${idea.title || "Spot"} photo`;
+            photoWrapper.appendChild(img);
+            body.appendChild(photoWrapper);
+          }
+
+          item.appendChild(timeColumn);
+          item.appendChild(body);
+          timeline.appendChild(item);
+        });
+      }
+
+      page.appendChild(timeline);
+      pagesContainer.appendChild(page);
+    });
+  }
+}
+
+window.updateBookmark = updateBookmark;
+
+
 function addIdeaCard(
   title,
   description,
@@ -329,6 +563,9 @@ function addIdeaCard(
   if (typeof updateFlowchart === "function") {
     updateFlowchart();
   }
+  if (typeof updateBookmark === "function") {
+    updateBookmark();
+  }
 }
 
 // フォーム送信処理
@@ -370,6 +607,9 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
     renderAllMarkers();
     const updatedIdea = appState.ideas[ideaIndex];
     renderIdeaCard(updatedIdea);
+    if (typeof updateBookmark === "function") {
+      updateBookmark();
+    }
 
     if (collaborationEnabled && window.webRTCManager) {
       if (updatedIdea) {
@@ -555,6 +795,9 @@ function deletePinAndIdea(pinData) {
   // UIを更新
   renderAllMarkers(); // マップを更新
   removeIdeaCard(pinData.id); // アイデアカードを削除
+  if (typeof updateBookmark === "function") {
+    updateBookmark();
+  }
 
   showNotification(`「${pinData.title}」を削除しました`, "success");
 }
@@ -660,6 +903,57 @@ document.addEventListener("DOMContentLoaded", function () {
       showNotification(`${day}の予定を表示中`, "info");
     });
   });
+
+  const bookmarkTitleInput = document.getElementById("bookmarkTitleInput");
+  const bookmarkCoverInput = document.getElementById("bookmarkCoverInput");
+  const bookmarkCoverClearBtn = document.getElementById("bookmarkCoverClearBtn");
+
+  if (bookmarkTitleInput && appState.bookmark) {
+    bookmarkTitleInput.value = appState.bookmark.title;
+    bookmarkTitleInput.addEventListener("input", (event) => {
+      appState.bookmark.title = event.target.value;
+      if (typeof updateBookmark === "function") {
+        updateBookmark();
+      }
+    });
+  }
+
+  if (bookmarkCoverInput) {
+    bookmarkCoverInput.addEventListener("change", (event) => {
+      const fileList = event.target.files;
+      const file = fileList && fileList[0];
+      if (!file) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (loadEvent) => {
+        const result = loadEvent && loadEvent.target ? loadEvent.target.result : null;
+        appState.bookmark.coverImage = result;
+        if (typeof updateBookmark === "function") {
+          updateBookmark();
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  if (bookmarkCoverClearBtn) {
+    bookmarkCoverClearBtn.addEventListener("click", () => {
+      if (bookmarkCoverInput) {
+        bookmarkCoverInput.value = "";
+      }
+      if (appState.bookmark) {
+        appState.bookmark.coverImage = null;
+      }
+      if (typeof updateBookmark === "function") {
+        updateBookmark();
+      }
+    });
+  }
+
+  if (typeof updateBookmark === "function") {
+    updateBookmark();
+  }
   simulateCollaboration();
   new CollaborationManager();
 

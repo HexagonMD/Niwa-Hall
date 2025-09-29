@@ -127,6 +127,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (viewName === "flowchart" && typeof window.updateFlowchart === "function") {
       window.updateFlowchart();
     }
+
+    if (viewName === "bookmark" && typeof window.updateBookmark === "function") {
+      window.updateBookmark();
+    }
   }
 
   function updateUserList() {

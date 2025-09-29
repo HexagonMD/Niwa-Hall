@@ -24,6 +24,10 @@
                 <span>📊</span>
                 <span class="tooltip">フローチャート</span>
             </button>
+            <button class="nav-button" data-view="bookmark" onclick="switchView('bookmark')">
+                <span>&#x1F4D6;</span>
+                <span class="tooltip">しおり</span>
+            </button>
         </div>
 
         <!-- メインコンテンツ -->
@@ -102,6 +106,27 @@
                                 <div class="timeline-title">ラーメン横丁でランチ</div>
                                 <div class="timeline-duration">所要時間: 1時間30分</div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Bookmark View -->
+                <div class="view bookmark-view" id="bookmark-view">
+                    <div class="bookmark-content">
+                        <div class="bookmark-controls">
+                            <h2>しおり表紙設定</h2>
+                            <div class="form-group">
+                                <label for="bookmarkTitleInput">タイトル</label>
+                                <input type="text" id="bookmarkTitleInput" placeholder="Trip Bookmark">
+                            </div>
+                            <div class="form-group">
+                                <label for="bookmarkCoverInput">表紙画像</label>
+                                <input type="file" id="bookmarkCoverInput" accept="image/*">
+                                <div class="bookmark-cover-preview" id="bookmarkCoverPreview"></div>
+                                <button type="button" class="btn btn-secondary" id="bookmarkCoverClearBtn">Clear Image</button>
+                            </div>
+                        </div>
+                        <div class="bookmark-preview">
+                            <div class="bookmark-pages" id="bookmarkPages"></div>
                         </div>
                     </div>
                 </div>
@@ -204,3 +229,4 @@
 </body>
 
 </html>
+
