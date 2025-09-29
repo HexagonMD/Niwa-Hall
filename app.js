@@ -483,9 +483,6 @@ function openEditModalForPin(pinData) {
 
     // 写真データを一時配列にコピー
     currentEditingPhotos = idea.photos ? [...idea.photos] : [];
-  } else {
-    // ideaがない場合（ピンのみの場合）
-    currentEditingPhotos = [];
   }
 
   // 写真プレビューをレンダリング
@@ -622,7 +619,7 @@ class CollaborationManager {
     const data = { type: "cursor", userId: this.userId, x: x, y: y };
   }
   broadcastDataChange(changeType, data) {
-    const message = {
+    const message = { 
       type: "dataChange",
       changeType: changeType,
       data: data,
@@ -775,10 +772,10 @@ function filterPinsByDay(day) {
       console.log(`Target day number: ${targetDay}`);
       ideasToShow = appState.ideas.filter((idea) => idea.day === targetDay);
     } else {
-      console.log("Fallback: No day number found, showing nothing.");
-      ideasToShow = [];
-    }
+    console.log("Fallback: No day number found, showing nothing.");
+    ideasToShow = [];
   }
+}
 
   console.log("ideasToShow:", JSON.parse(JSON.stringify(ideasToShow)));
 
@@ -805,6 +802,12 @@ function filterPinsByDay(day) {
   if (typeof window.renderAllMarkers === "function") {
     console.log(`Rendering ${pinsToShow.length} map markers.`);
     window.renderAllMarkers(pinsToShow);
+  }
+
+  // Re-render flowchart/timeline
+  if (typeof window.updateFlowchart === "function") {
+    console.log(`Updating flowchart.`);
+    window.updateFlowchart();
   }
   console.log("--- Filtering complete ---");
 }
