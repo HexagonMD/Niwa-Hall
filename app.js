@@ -464,8 +464,91 @@ function updateBookmark() {
   }
 }
 
+
 window.updateBookmark = updateBookmark;
 
+function exportBookmarkToPDF() {
+  if (typeof updateBookmark === "function") {
+    updateBookmark();
+  }
+
+  const pagesContainer = document.getElementById("bookmarkPages");
+  if (!pagesContainer) {
+    if (typeof showNotification === "function") {
+      showNotification("栞のページが見つかりません", "error");
+    }
+    return;
+  }
+
+  const printableRoot = pagesContainer.cloneNode(true);
+  const title = (appState.bookmark?.title || "").trim() || "Trip Bookmark";
+  const sanitizedTitle = escapeHtml(title);
+
+  const printWindow = window.open("", "bookmark-print");
+  if (!printWindow) {
+    if (typeof showNotification === "function") {
+      showNotification("ポップアップがブロックされました。ブラウザの設定を確認してください。", "error");
+    }
+    return;
+  }
+
+  const styles = [
+    '* { box-sizing: border-box; }',
+    'html, body { margin: 0; padding: 0; }',
+    'body { background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #2c3e50; }',
+    '.bookmark-pages { display: flex; flex-direction: column; gap: 16px; padding: 12mm 0; align-items: center; }',
+    '.bookmark-page { width: 210mm; min-height: calc(297mm - 30mm); background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15mm 18mm; display: flex; flex-direction: column; gap: 24px; box-shadow: none; page-break-after: always; }',
+    '.bookmark-page:last-child { page-break-after: auto; }',
+    '.bookmark-cover-page { align-items: center; justify-content: center; text-align: center; }',
+    '.bookmark-cover-inner { display: flex; flex-direction: column; gap: 24px; width: 100%; align-items: center; }',
+    '.bookmark-cover-title { font-size: 32px; font-weight: 600; letter-spacing: 2px; }',
+    '.bookmark-cover-image { width: 100%; max-width: 520px; border-radius: 12px; overflow: hidden; }',
+    '.bookmark-cover-image img { width: 100%; height: auto; display: block; }',
+    '.bookmark-cover-placeholder { width: 100%; max-width: 520px; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 60px 20px; color: #94a3b8; font-size: 14px; background: #f8fafc; }',
+    '.bookmark-day-header { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #ecf0f1; padding-bottom: 12px; }',
+    '.bookmark-day-label { font-size: 22px; font-weight: 600; }',
+    '.bookmark-day-summary { font-size: 14px; color: #7f8c8d; }',
+    '.bookmark-timeline { display: flex; flex-direction: column; gap: 18px; position: relative; margin-top: 12px; }',
+    '.bookmark-timeline::before { content: ""; position: absolute; top: 0; bottom: 0; left: 14px; width: 2px; background: linear-gradient(180deg, #3498db 0%, rgba(52, 152, 219, 0.1) 100%); }',
+    '.bookmark-timeline-item { display: flex; gap: 24px; position: relative; padding-left: 36px; }',
+    '.bookmark-timeline-item::before { content: ""; position: absolute; left: 7px; top: 8px; width: 14px; height: 14px; background: #3498db; border-radius: 50%; box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15); }',
+    '.bookmark-item-time { min-width: 80px; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #7f8c8d; }',
+    '.bookmark-time-start { font-weight: 600; color: #2c3e50; }',
+    '.bookmark-item-body { background: #f8fafc; border-radius: 10px; padding: 16px 20px; flex: 1; display: flex; flex-direction: column; gap: 10px; border: 1px solid rgba(52, 152, 219, 0.18); }',
+    '.bookmark-item-title { font-size: 18px; font-weight: 600; }',
+    '.bookmark-item-desc { font-size: 14px; line-height: 1.5; color: #576574; }',
+    '.bookmark-item-meta { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; }',
+    '.bookmark-item-meta span { background: rgba(52, 152, 219, 0.12); color: #1d6fa5; padding: 4px 10px; border-radius: 999px; }',
+    '.bookmark-item-photo { border-radius: 8px; overflow: hidden; margin-top: 6px; }',
+    '.bookmark-item-photo img { width: 100%; height: 160px; object-fit: cover; display: block; }',
+    '.bookmark-empty { border: 2px dashed #d1d9e6; border-radius: 8px; padding: 40px 20px; text-align: center; color: #95a5a6; font-size: 16px; }',
+    '@media print { body { margin: 0; } }',
+    '@page { size: A4; margin: 0; }'
+  ].join('');
+
+  const doc = printWindow.document;
+  doc.open();
+  doc.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>' + sanitizedTitle + '</title><style>' + styles + '</style></head><body>');
+  doc.write('<div class="bookmark-pages">' + printableRoot.innerHTML + '</div>');
+  doc.write('<script>window.addEventListener("load", function(){ window.focus(); window.print(); }); window.addEventListener("afterprint", function(){ window.close(); });</script>');
+  doc.write('</body></html>');
+  doc.close();
+
+  printWindow.document.title = ' ';
+  if (printWindow.history && typeof printWindow.history.replaceState === "function") {
+    try {
+      printWindow.history.replaceState({}, '', ' ');
+    } catch (error) {
+      console.warn('Failed to adjust print window history:', error);
+    }
+  }
+
+  if (typeof showNotification === "function") {
+    showNotification("PDF出力用のプレビューを開きました", "info", 5000);
+  }
+}
+
+window.exportBookmarkToPDF = exportBookmarkToPDF;
 
 function addIdeaCard(
   title,
@@ -907,6 +990,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const bookmarkTitleInput = document.getElementById("bookmarkTitleInput");
   const bookmarkCoverInput = document.getElementById("bookmarkCoverInput");
   const bookmarkCoverClearBtn = document.getElementById("bookmarkCoverClearBtn");
+  const bookmarkExportBtn = document.getElementById("bookmarkExportBtn");
 
   if (bookmarkTitleInput && appState.bookmark) {
     bookmarkTitleInput.value = appState.bookmark.title;
@@ -948,6 +1032,12 @@ document.addEventListener("DOMContentLoaded", function () {
       if (typeof updateBookmark === "function") {
         updateBookmark();
       }
+    });
+  }
+
+  if (bookmarkExportBtn) {
+    bookmarkExportBtn.addEventListener("click", () => {
+      exportBookmarkToPDF();
     });
   }
 

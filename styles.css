@@ -591,16 +591,15 @@ body {
 
 .bookmark-page {
   width: 210mm;
-  min-height: 297mm;
+  min-height: calc(297mm - 30mm);
   background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 14px 40px rgba(44, 62, 80, 0.15);
-  padding: 36px 40px;
+  padding: 15mm 18mm;
   display: flex;
   flex-direction: column;
   gap: 24px;
 }
-
 .bookmark-cover-page {
   align-items: center;
   justify-content: center;
