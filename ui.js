@@ -2,13 +2,6 @@
 let draggedElement = null;
 
 document.addEventListener("DOMContentLoaded", function () {
-  const timelineItems = document.querySelectorAll(".timeline-item");
-  timelineItems.forEach((item) => {
-    item.addEventListener("dragstart", handleDragStart);
-    item.addEventListener("dragover", handleDragOver);
-    item.addEventListener("drop", handleDrop);
-    item.addEventListener("dragend", handleDragEnd);
-  });
   const ideaCards = document.querySelectorAll(".idea-card");
   ideaCards.forEach((card) => {
     card.draggable = true;
@@ -197,18 +190,18 @@ document.addEventListener("DOMContentLoaded", () => {
               ${ideaData.endTime ? `<span>終了: ${ideaData.endTime}</span>` : ""}
             </div>
           `;
-        }
-        
-        let photoHTML = '';
-        if (ideaData.photos && ideaData.photos.length > 0) {
-          photoHTML = `<div class="idea-photos">`;
-          ideaData.photos.forEach(photoSrc => {
-            photoHTML += `<img src="${photoSrc}" alt="idea photo">`;
-          });
-          photoHTML += `</div>`;
-        }
-        
-        card.innerHTML = `
+    }
+
+    let photoHTML = "";
+    if (ideaData.photos && ideaData.photos.length > 0) {
+      photoHTML = `<div class="idea-photos">`;
+      ideaData.photos.forEach((photoSrc) => {
+        photoHTML += `<img src="${photoSrc}" alt="idea photo">`;
+      });
+      photoHTML += `</div>`;
+    }
+
+    card.innerHTML = `
           <h3>${typeEmoji[ideaData.type] || "🗓️"} ${ideaData.title}</h3>
           <p>${ideaData.description}</p>
           ${photoHTML}
@@ -216,7 +209,9 @@ document.addEventListener("DOMContentLoaded", () => {
           <div class="idea-tags">
             <span class="tag">${typeLabel[ideaData.type] || "その他"}</span>
             ${
-              ideaData.day && ideaData.day !== "0" ? `<span class="tag">${ideaData.day}日目</span>` : ""
+              ideaData.day && ideaData.day !== "0"
+                ? `<span class="tag">${ideaData.day}日目</span>`
+                : ""
             }
           </div>
         `;
@@ -224,34 +219,34 @@ document.addEventListener("DOMContentLoaded", () => {
       ideaBoard.appendChild(card);
       console.log("✅ アイデアカードを画面に追加しました");
     } else {
-          console.log("🔁 アイデアカードを更新しました");
-        }
-        return card;
-      }
-      
-      function removeIdeaCard(ideaId) {
-        const card = document.querySelector(`[data-idea-id="${ideaId}"]`);
-        if (card) {
-          card.parentElement.removeChild(card);
-          console.log(`✅ アイデアカード(id: ${ideaId})を削除しました`);
-        }
-      }
-      
-        window.showNotification = showNotification;
-        window.openModal = openModal;
-        window.closeModal = closeModal;
-        window.switchView = switchView;
-        window.updateUserList = updateUserList;
-        window.renderIdeaCard = renderIdeaCard;
-        window.removeIdeaCard = removeIdeaCard; // 公開
-      
-        window.UI = {
-          showNotification,
-          openModal,
-          closeModal,
-          switchView,
-          updateUserList,
-          renderIdeaCard,
-          removeIdeaCard,
-        };
-      });
+      console.log("🔁 アイデアカードを更新しました");
+    }
+    return card;
+  }
+
+  function removeIdeaCard(ideaId) {
+    const card = document.querySelector(`[data-idea-id="${ideaId}"]`);
+    if (card) {
+      card.parentElement.removeChild(card);
+      console.log(`✅ アイデアカード(id: ${ideaId})を削除しました`);
+    }
+  }
+
+  window.showNotification = showNotification;
+  window.openModal = openModal;
+  window.closeModal = closeModal;
+  window.switchView = switchView;
+  window.updateUserList = updateUserList;
+  window.renderIdeaCard = renderIdeaCard;
+  window.removeIdeaCard = removeIdeaCard; // 公開
+
+  window.UI = {
+    showNotification,
+    openModal,
+    closeModal,
+    switchView,
+    updateUserList,
+    renderIdeaCard,
+    removeIdeaCard,
+  };
+});

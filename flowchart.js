@@ -15,7 +15,6 @@ function addTimelineItem(idea) {
   const timeline = document.getElementById("timeline");
   const timelineItem = document.createElement("div");
   timelineItem.className = "timeline-item";
-  timelineItem.draggable = true;
 
   timelineItem.innerHTML = `
     <div class="time-display">${idea.startTime || "未定"}</div>
@@ -25,9 +24,5 @@ function addTimelineItem(idea) {
     </div>
   `;
 
-  timelineItem.addEventListener("dragstart", handleDragStart);
-  timelineItem.addEventListener("dragover", handleDragOver);
-  timelineItem.addEventListener("drop", handleDrop);
-  timelineItem.addEventListener("dragend", handleDragEnd);
   timeline.appendChild(timelineItem);
 }
