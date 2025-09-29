@@ -2,7 +2,27 @@ function updateFlowchart() {
   const timeline = document.getElementById("timeline");
   timeline.innerHTML = ""; // タイムラインをクリア
 
-  const timedIdeas = appState.ideas
+  const activeTab = document.querySelector(".day-tab.active");
+  const day = activeTab ? activeTab.textContent : "すべて";
+  const trimmedDay = day.trim();
+
+  let ideasToRender;
+
+  if (trimmedDay.includes("すべて")) {
+    ideasToRender = appState.ideas;
+  } else if (trimmedDay === "未定") {
+    ideasToRender = appState.ideas.filter((idea) => idea.day === "0");
+  } else {
+    const dayNumberMatch = trimmedDay.match(/\d+/);
+    if (dayNumberMatch) {
+      const targetDay = dayNumberMatch[0];
+      ideasToRender = appState.ideas.filter((idea) => idea.day === targetDay);
+    } else {
+      ideasToRender = [];
+    }
+  }
+
+  const timedIdeas = ideasToRender
     .filter((idea) => idea.startTime)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
