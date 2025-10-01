@@ -8,6 +8,7 @@ let collaborationEnabled = false; // 協働機能の状態
 // アプリの状態管理
 let appState = {
   currentView: "idea",
+  days: [{ id: 1, name: "1日目" }],
   pins: [],
   ideas: [],
   timeline: [],
@@ -17,7 +18,6 @@ let appState = {
   bookmark: {
     title: "旅行のしおり",
     coverImage: null,
-    backgroundColor: "#ffffff",
   },
 };
 
@@ -1058,18 +1058,114 @@ function createDetailedPinModal() {
   document.body.appendChild(modal);
 }
 
+function updateDayOptions() {
+  const daySelect = document.getElementById("itemDay");
+  if (!daySelect) return;
+
+  const selectedValue = daySelect.value;
+
+  Array.from(daySelect.options).forEach(option => {
+    if (option.value !== "0") {
+      option.remove();
+    }
+  });
+
+  appState.days.forEach(day => {
+    const option = document.createElement("option");
+    option.value = day.id;
+    option.textContent = day.name;
+    daySelect.appendChild(option);
+  });
+
+  if (Array.from(daySelect.options).some(opt => opt.value === selectedValue)) {
+    daySelect.value = selectedValue;
+  } else {
+    daySelect.value = "0";
+  }
+}
+
+function renderDayTabs() {
+  const dayTabsContainer = document.querySelector(".day-tabs");
+  if (!dayTabsContainer) return;
+
+  // 動的に生成されたタブのみをクリア（staticクラスを持つものは除く）
+  dayTabsContainer.querySelectorAll(".day-tab:not(.static)").forEach(tab => tab.remove());
+
+  const addDayBtn = document.getElementById("addDayBtn");
+
+  // appState.daysからタブを生成
+  appState.days.forEach(day => {
+    const tab = document.createElement("button");
+    tab.className = "day-tab";
+    tab.textContent = day.name;
+    tab.dataset.dayId = day.id;
+
+    // 削除ボタンを追加
+    const deleteBtn = document.createElement("span");
+    deleteBtn.className = "delete-day-btn";
+    deleteBtn.textContent = "×";
+    deleteBtn.dataset.dayId = day.id;
+    tab.appendChild(deleteBtn);
+
+    dayTabsContainer.insertBefore(tab, addDayBtn);
+  });
+}
+
 // タブ切り替え機能
 document.addEventListener("DOMContentLoaded", function () {
-  const dayTabs = document.querySelectorAll(".day-tab");
-  dayTabs.forEach((tab) => {
-    tab.addEventListener("click", function () {
-      dayTabs.forEach((t) => t.classList.remove("active"));
-      this.classList.add("active");
-      const day = this.textContent;
+  const dayTabsContainer = document.querySelector(".day-tabs");
+  dayTabsContainer.addEventListener("click", function(event) {
+    const target = event.target;
+
+    // 削除ボタンのクリック
+    if (target.classList.contains("delete-day-btn")) {
+      event.stopPropagation(); // タブ自体のクリックイベントを発火させない
+      const dayIdToDelete = parseInt(target.dataset.dayId, 10);
+      if (confirm(`${appState.days.find(d => d.id === dayIdToDelete)?.name}を削除しますか？`)) {
+        // 該当する日のアイデアを「未定」に移動
+        appState.ideas.forEach(idea => {
+          if (idea.day == dayIdToDelete) {
+            idea.day = "0";
+          }
+        });
+
+        // appState.daysから削除
+        appState.days = appState.days.filter(day => day.id !== dayIdToDelete);
+
+        // UIを更新
+        renderDayTabs();
+        updateDayOptions();
+        filterPinsByDay("未定"); // 未定タブをアクティブにする
+        document.querySelector(".day-tab.static[data-day-id=\"0\"]")?.classList.add("active");
+
+        showNotification("日程を削除しました", "success");
+      }
+      return; // これ以降のタブクリック処理を中断
+    }
+
+    // 日程タブのクリック
+    if (target.classList.contains("day-tab") && !target.classList.contains("day-tab-add")) {
+      dayTabsContainer.querySelectorAll(".day-tab").forEach(t => t.classList.remove("active"));
+      target.classList.add("active");
+      const day = target.textContent;
       filterPinsByDay(day);
       showNotification(`${day}の予定を表示中`, "info");
-    });
+    }
+
+    // 日程追加ボタンのクリック
+    if (target.id === "addDayBtn") {
+      const nextDayNum = appState.days.length > 0 ? Math.max(...appState.days.map(d => d.id)) + 1 : 1;
+      const newDay = { id: nextDayNum, name: `${nextDayNum}日目` };
+      appState.days.push(newDay);
+      
+      renderDayTabs();
+      updateDayOptions();
+      showNotification(`「${newDay.name}」を追加しました`, "success");
+    }
   });
+
+  renderDayTabs(); // 初期タブを描画
+  updateDayOptions(); // 初期オプションを描画
 
   const bookmarkTitleInput = document.getElementById("bookmarkTitleInput");
   const bookmarkCoverInput = document.getElementById("bookmarkCoverInput");
