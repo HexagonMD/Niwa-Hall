@@ -74,7 +74,13 @@ document.addEventListener("DOMContentLoaded", () => {
       modal.classList.add("active");
     }
     const daySelect = document.getElementById("itemDay");
-    if (daySelect && (typeof window.editingPinId === "undefined" || window.editingPinId === null)) {
+    const hasEditingGetter = typeof window.getEditingPinId === "function";
+    const editingId = hasEditingGetter
+      ? window.getEditingPinId()
+      : typeof window.editingPinId !== "undefined"
+      ? window.editingPinId
+      : null;
+    if (daySelect && (editingId === undefined || editingId === null)) {
       daySelect.value = "1";
     }
   }
@@ -91,6 +97,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const daySelect = document.getElementById("itemDay");
     if (daySelect) {
       daySelect.value = "1";
+    }
+    if (typeof window.setEditingPinId === "function") {
+      window.setEditingPinId(null);
+    } else if (typeof window.editingPinId !== "undefined") {
+      window.editingPinId = null;
     }
     const locationInput = document.getElementById("itemLocation");
     if (locationInput) {
