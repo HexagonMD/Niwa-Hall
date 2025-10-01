@@ -55,15 +55,7 @@ function updateFlowchart() {
       const dayIdeas = ideasByDay.get(dayKey);
       dayIdeas.sort((a, b) => a.startTime.localeCompare(b.startTime));
       dayIdeas.forEach(idea => {
-        const timelineItem = document.createElement("div");
-        timelineItem.className = "timeline-item";
-        timelineItem.innerHTML = `
-          <div class="time-display">${idea.startTime || "未定"}</div>
-          <div class="timeline-content">
-            <div class="timeline-title">${idea.title}</div>
-            <div class="timeline-duration">所要時間: ${idea.duration || "未定"}</div>
-          </div>
-        `;
+        const timelineItem = createTimelineItemElement(idea);
         itemsContainer.appendChild(timelineItem);
       });
     });
@@ -104,18 +96,63 @@ function updateFlowchart() {
 }
 
 // この関数は個別日程表示の時だけ使われる
-function addTimelineItem(idea) {
-  const timeline = document.getElementById("timeline");
+function createTimelineItemElement(idea) {
   const timelineItem = document.createElement("div");
   timelineItem.className = "timeline-item";
+  timelineItem.dataset.ideaId = idea.id;
 
-  timelineItem.innerHTML = `
-    <div class="time-display">${idea.startTime || "未定"}</div>
-    <div class="timeline-content">
-      <div class="timeline-title">${idea.title}</div>
-      <div class="timeline-duration">所要時間: ${idea.duration || "未定"}</div>
-    </div>
-  `;
+  const timeDisplay = document.createElement("div");
+  timeDisplay.className = "time-display";
+  timeDisplay.textContent = idea.startTime || "未定";
+
+  const contentWrapper = document.createElement("div");
+  contentWrapper.className = "timeline-content";
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "timeline-title";
+  titleEl.textContent = idea.title;
+
+  const durationEl = document.createElement("div");
+  durationEl.className = "timeline-duration";
+  durationEl.textContent = "所要時間: " + (idea.duration || "未定");
+
+  contentWrapper.appendChild(titleEl);
+  contentWrapper.appendChild(durationEl);
+
+  timelineItem.appendChild(timeDisplay);
+  timelineItem.appendChild(contentWrapper);
+
+  if (typeof handleDragStart === "function") {
+    timelineItem.draggable = true;
+    timelineItem.addEventListener("dragstart", handleDragStart);
+  }
+  if (typeof handleDragOver === "function") {
+    timelineItem.addEventListener("dragover", handleDragOver);
+  }
+  if (typeof handleDrop === "function") {
+    timelineItem.addEventListener("drop", handleDrop);
+  }
+  if (typeof handleDragEnd === "function") {
+    timelineItem.addEventListener("dragend", handleDragEnd);
+  }
+
+  timelineItem.addEventListener("click", () => {
+    if (timelineItem.dataset.skipClick === "true") {
+      delete timelineItem.dataset.skipClick;
+      return;
+    }
+    if (typeof window.openEditModalForIdea === "function") {
+      window.openEditModalForIdea(idea.id);
+    }
+  });
+
+  return timelineItem;
+}
+
+
+function addTimelineItem(idea) {
+  const timeline = document.getElementById("timeline");
+  const timelineItem = createTimelineItemElement(idea);
 
   timeline.appendChild(timelineItem);
 }
