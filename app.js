@@ -871,6 +871,35 @@ function renderPhotoPreviews() {
 }
 
 // 写真プレビューの処理
+
+const deleteItemBtn = document.getElementById("deleteItemBtn");
+if (deleteItemBtn) {
+  deleteItemBtn.addEventListener("click", handleDeleteCurrentIdea);
+}
+
+function handleDeleteCurrentIdea() {
+  const currentEditingId = getEditingPinId();
+  if (!currentEditingId) {
+    if (typeof showNotification === "function") {
+      showNotification("\u524a\u9664\u3067\u304d\u308b\u30b9\u30dd\u30c3\u30c8\u304c\u3042\u308a\u307e\u305b\u3093", "warning");
+    }
+    return;
+  }
+
+  const pin = appState.pins.find((p) => p.id === currentEditingId);
+  const idea = appState.ideas.find((i) => i.id === currentEditingId);
+  const title = (idea && idea.title) || (pin && pin.title) || "\u30b9\u30dd\u30c3\u30c8";
+  const confirmationMessage = "\u300c" + title + "\u300d\u3092\u524a\u9664\u3057\u307e\u3059\u304b\uff1f";
+
+  if (!confirm(confirmationMessage)) {
+    return;
+  }
+
+  const pinData = pin || { id: currentEditingId, title };
+  deletePinAndIdea(pinData);
+  closeModal();
+}
+
 document.getElementById("itemPhotos").addEventListener("change", function (event) {
   const files = event.target.files;
   let filesToProcess = files.length;

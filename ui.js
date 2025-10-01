@@ -87,6 +87,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (daySelect && (editingId === undefined || editingId === null)) {
       daySelect.value = "1";
     }
+    const deleteBtn = document.getElementById("deleteItemBtn");
+    if (deleteBtn) {
+      deleteBtn.style.display = editingId ? "inline-flex" : "none";
+    }
   }
 
   function closeModal() {
@@ -101,6 +105,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const daySelect = document.getElementById("itemDay");
     if (daySelect) {
       daySelect.value = "1";
+    }
+    const deleteBtn = document.getElementById("deleteItemBtn");
+    if (deleteBtn) {
+      deleteBtn.style.display = "none";
     }
     if (typeof window.setEditingPinId === "function") {
       window.setEditingPinId(null);
