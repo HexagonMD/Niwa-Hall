@@ -1486,6 +1486,9 @@ function filterPinsByDay(day) {
     console.log(`Updating flowchart.`);
     window.updateFlowchart();
   }
+  if (typeof window.updateIdeaBoardEmptyState === "function") {
+    window.updateIdeaBoardEmptyState();
+  }
   console.log("--- Filtering complete ---");
 }
 

@@ -197,6 +197,31 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log(`現在の参加者数: ${userCount}人`);
   }
 
+  function updateIdeaBoardEmptyState() {
+    const ideaBoard = document.getElementById("ideaBoard");
+    if (!ideaBoard) {
+      return;
+    }
+    const emptyStateId = "ideaEmptyState";
+    const existingEmpty = document.getElementById(emptyStateId);
+    const hasCards = ideaBoard.querySelector(".idea-card");
+    if (hasCards) {
+      if (existingEmpty) {
+        existingEmpty.remove();
+      }
+      return;
+    }
+    if (!existingEmpty) {
+      const empty = document.createElement("div");
+      empty.id = emptyStateId;
+      empty.className = "idea-empty-state";
+      const message = document.createElement("p");
+      message.innerHTML = "アイデアがまだ追加されていません。<br>マップや検索からスポットを追加してみましょう。";
+      empty.appendChild(message);
+      ideaBoard.appendChild(empty);
+    }
+  }
+
   function renderIdeaCard(ideaData) {
     const ideaBoard = document.getElementById("ideaBoard");
     if (!ideaBoard) {
@@ -271,6 +296,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       console.log("🔁 アイデアカードを更新しました");
     }
+    updateIdeaBoardEmptyState();
     return card;
   }
 
@@ -280,6 +306,7 @@ document.addEventListener("DOMContentLoaded", () => {
       card.parentElement.removeChild(card);
       console.log(`✅ アイデアカード(id: ${ideaId})を削除しました`);
     }
+    updateIdeaBoardEmptyState();
   }
 
   window.showNotification = showNotification;
@@ -287,6 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
   window.closeModal = closeModal;
   window.switchView = switchView;
   window.updateUserList = updateUserList;
+  window.updateIdeaBoardEmptyState = updateIdeaBoardEmptyState;
   window.renderIdeaCard = renderIdeaCard;
   window.removeIdeaCard = removeIdeaCard; // 公開
 
@@ -296,7 +324,10 @@ document.addEventListener("DOMContentLoaded", () => {
     closeModal,
     switchView,
     updateUserList,
+    updateIdeaBoardEmptyState,
     renderIdeaCard,
     removeIdeaCard,
   };
+
+  updateIdeaBoardEmptyState();
 });
