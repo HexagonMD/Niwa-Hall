@@ -64,7 +64,7 @@ class WebRTCManager {
     return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
   }
 
-  async init(serverUrl = "http://localhost:3000") {
+  async init(serverUrl = window.location.origin) {
     return new Promise((resolve, reject) => {
       try {
         console.log("🔄 Socket.IO接続開始...");
