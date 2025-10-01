@@ -17,6 +17,7 @@ let appState = {
   bookmark: {
     title: "旅行のしおり",
     coverImage: null,
+    backgroundColor: "#ffffff",
   },
 };
 
@@ -264,12 +265,40 @@ function updateBookmark() {
     return;
   }
 
-  const bookmarkState = appState.bookmark || { title: "", coverImage: null };
+  if (!appState.bookmark) {
+    appState.bookmark = { title: "", coverImage: null, backgroundColor: "#ffffff" };
+  }
+
+  const bookmarkState = appState.bookmark;
+  if (!bookmarkState.backgroundColor) {
+    bookmarkState.backgroundColor = "#ffffff";
+  }
+
+  let pageBackground = bookmarkState.backgroundColor || "#ffffff";
   const title = (bookmarkState.title || "").trim() || "Trip Bookmark";
 
   const titleInput = document.getElementById("bookmarkTitleInput");
   if (titleInput && titleInput.value !== bookmarkState.title) {
     titleInput.value = bookmarkState.title;
+  }
+
+  const backgroundSelect = document.getElementById("bookmarkBackgroundSelect");
+  if (backgroundSelect) {
+    const options = Array.from(backgroundSelect.options || []);
+    const fallbackColor = options.length > 0 ? options[0].value : "#ffffff";
+    const selectableColor = options.some((option) => option.value === pageBackground)
+      ? pageBackground
+      : fallbackColor;
+
+    if (backgroundSelect.value !== selectableColor) {
+      backgroundSelect.value = selectableColor;
+    }
+
+    if (bookmarkState.backgroundColor !== selectableColor) {
+      bookmarkState.backgroundColor = selectableColor;
+    }
+
+    pageBackground = selectableColor;
   }
 
   const coverPreview = document.getElementById("bookmarkCoverPreview");
@@ -292,6 +321,8 @@ function updateBookmark() {
 
   const coverPage = document.createElement("div");
   coverPage.className = "bookmark-page bookmark-cover-page";
+  coverPage.style.setProperty("--bookmark-page-bg", pageBackground);
+  coverPage.style.backgroundColor = pageBackground;
   const coverInner = document.createElement("div");
   coverInner.className = "bookmark-cover-inner";
 
@@ -335,6 +366,8 @@ function updateBookmark() {
   if (dayKeys.length === 0) {
     const emptyPage = document.createElement("div");
     emptyPage.className = "bookmark-page bookmark-empty-page";
+    emptyPage.style.setProperty("--bookmark-page-bg", pageBackground);
+    emptyPage.style.backgroundColor = pageBackground;
     const emptyMessage = document.createElement("div");
     emptyMessage.className = "bookmark-empty";
     emptyMessage.textContent = "登録されている場所がありません";
@@ -364,6 +397,8 @@ function updateBookmark() {
 
       const page = document.createElement("div");
       page.className = "bookmark-page bookmark-day-page";
+      page.style.setProperty("--bookmark-page-bg", pageBackground);
+      page.style.backgroundColor = pageBackground;
 
       const header = document.createElement("div");
       header.className = "bookmark-day-header";
@@ -481,6 +516,11 @@ function exportBookmarkToPDF() {
   }
 
   const printableRoot = pagesContainer.cloneNode(true);
+  const backgroundColor = appState.bookmark?.backgroundColor || "#ffffff";
+  printableRoot.querySelectorAll(".bookmark-page").forEach((page) => {
+    page.style.setProperty("--bookmark-page-bg", backgroundColor);
+    page.style.backgroundColor = backgroundColor;
+  });
   const title = (appState.bookmark?.title || "").trim() || "Trip Bookmark";
   const sanitizedTitle = escapeHtml(title);
 
@@ -497,7 +537,7 @@ function exportBookmarkToPDF() {
     'html, body { margin: 0; padding: 0; }',
     'body { background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #2c3e50; }',
     '.bookmark-pages { display: flex; flex-direction: column; gap: 16px; padding: 12mm 0; align-items: center; }',
-    '.bookmark-page { width: 210mm; min-height: calc(297mm - 30mm); background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15mm 18mm; display: flex; flex-direction: column; gap: 24px; box-shadow: none; page-break-after: always; }',
+    '.bookmark-page { width: 210mm; min-height: calc(297mm - 30mm); background: var(--bookmark-page-bg, #ffffff); border: 1px solid #e5e7eb; border-radius: 12px; padding: 15mm 18mm; display: flex; flex-direction: column; gap: 24px; box-shadow: none; page-break-after: always; }',
     '.bookmark-page:last-child { page-break-after: auto; }',
     '.bookmark-cover-page { align-items: center; justify-content: center; text-align: center; }',
     '.bookmark-cover-inner { display: flex; flex-direction: column; gap: 24px; width: 100%; align-items: center; }',
@@ -991,11 +1031,36 @@ document.addEventListener("DOMContentLoaded", function () {
   const bookmarkCoverInput = document.getElementById("bookmarkCoverInput");
   const bookmarkCoverClearBtn = document.getElementById("bookmarkCoverClearBtn");
   const bookmarkExportBtn = document.getElementById("bookmarkExportBtn");
+  const bookmarkBackgroundSelect = document.getElementById("bookmarkBackgroundSelect");
 
   if (bookmarkTitleInput && appState.bookmark) {
     bookmarkTitleInput.value = appState.bookmark.title;
     bookmarkTitleInput.addEventListener("input", (event) => {
       appState.bookmark.title = event.target.value;
+      if (typeof updateBookmark === "function") {
+        updateBookmark();
+      }
+    });
+  }
+
+  if (bookmarkBackgroundSelect) {
+    if (!appState.bookmark) {
+      appState.bookmark = { title: "", coverImage: null, backgroundColor: "#ffffff" };
+    }
+
+    const options = Array.from(bookmarkBackgroundSelect.options || []);
+    const fallbackColor = options.length > 0 ? options[0].value : "#ffffff";
+    const stateColor = appState.bookmark.backgroundColor || fallbackColor;
+    const selectableColor = options.some((option) => option.value === stateColor)
+      ? stateColor
+      : fallbackColor;
+
+    bookmarkBackgroundSelect.value = selectableColor;
+    appState.bookmark.backgroundColor = selectableColor;
+
+    bookmarkBackgroundSelect.addEventListener("change", (event) => {
+      const selectedColor = event.target.value || fallbackColor;
+      appState.bookmark.backgroundColor = selectedColor;
       if (typeof updateBookmark === "function") {
         updateBookmark();
       }

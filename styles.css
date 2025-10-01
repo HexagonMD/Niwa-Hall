@@ -592,7 +592,7 @@ body {
 .bookmark-page {
   width: 210mm;
   min-height: calc(297mm - 30mm);
-  background: #ffffff;
+  background: var(--bookmark-page-bg, #ffffff);
   border-radius: 12px;
   box-shadow: 0 14px 40px rgba(44, 62, 80, 0.15);
   padding: 15mm 18mm;
