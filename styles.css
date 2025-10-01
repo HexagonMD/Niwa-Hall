@@ -385,6 +385,20 @@ body {
   font-size: 14px;
 }
 
+.form-group input[readonly] {
+  background: #f1f3f5;
+  border-color: #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.form-group input[readonly]:hover,
+.form-group input[readonly]:focus {
+  border-color: #d1d5db;
+  box-shadow: none;
+  outline: none;
+}
+
 .photo-previews {
   display: flex;
   gap: 10px;
