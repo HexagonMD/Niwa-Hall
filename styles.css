@@ -866,3 +866,58 @@ body {
     background: rgba(0,0,0,0.3);
     color: #000;
 }
+
+/* --- フローチャート横並び表示用スタイル --- */
+
+/* 横並び表示の親コンテナ (「全日程」選択時) */
+.timeline.lanes-view {
+  display: flex;
+  gap: 15px;
+  align-items: flex-start;
+  overflow-x: auto;
+  /* 既存の .timeline の padding: 20px; はそのまま活かす */
+}
+
+/* 各日付のレーン */
+.timeline.lanes-view .flowchart-lane {
+  flex: 0 0 320px; /* レーンの幅を固定 (flex-grow, flex-shrink, flex-basis) */
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 10px;
+}
+
+/* レーン内のアイテムコンテナ */
+.timeline.lanes-view .timeline-items-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 15px;
+}
+
+/* 横並び表示の時のアイテムはマージンをリセット */
+.timeline.lanes-view .timeline-item {
+  margin-bottom: 0;
+}
+
+/* 横並び表示の時のヘッダー */
+.timeline.lanes-view .timeline-day-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: #495057;
+  padding: 10px 15px;
+  border-bottom: 1px solid #e9ecef;
+  margin: 0;
+  position: sticky;
+  top: 0;
+  background-color: #f8f9fa; /* レーンの背景色に合わせる */
+  z-index: 1;
+  border-radius: 10px 10px 0 0;
+}
+
+/* 予定がない場合のメッセージ（共通） */
+.timeline-empty {
+  text-align: center;
+  padding: 40px;
+  color: #7f8c8d;
+  font-size: 16px;
+}
