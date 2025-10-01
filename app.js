@@ -21,6 +21,24 @@ let appState = {
   },
 };
 
+const BOOKMARK_BACKGROUND_COLORS = new Set([
+  "#ffffff",
+  "#f8fafc",
+  "#fef3c7",
+  "#e0f2fe",
+  "#dcfce7",
+  "#f5f3ff",
+]);
+
+function resolveBookmarkBackgroundColor(candidate) {
+  if (typeof candidate !== "string") {
+    return "#ffffff";
+  }
+
+  const trimmed = candidate.trim().toLowerCase();
+  return BOOKMARK_BACKGROUND_COLORS.has(trimmed) ? trimmed : "#ffffff";
+}
+
 // WebRTC Manager初期化
 async function initWebRTC() {
   try {
@@ -270,11 +288,12 @@ function updateBookmark() {
   }
 
   const bookmarkState = appState.bookmark;
-  if (!bookmarkState.backgroundColor) {
-    bookmarkState.backgroundColor = "#ffffff";
+  const resolvedColor = resolveBookmarkBackgroundColor(bookmarkState.backgroundColor);
+  if (bookmarkState.backgroundColor !== resolvedColor) {
+    bookmarkState.backgroundColor = resolvedColor;
   }
 
-  let pageBackground = bookmarkState.backgroundColor || "#ffffff";
+  let pageBackground = resolvedColor;
   const title = (bookmarkState.title || "").trim() || "Trip Bookmark";
 
   const titleInput = document.getElementById("bookmarkTitleInput");
@@ -285,10 +304,11 @@ function updateBookmark() {
   const backgroundSelect = document.getElementById("bookmarkBackgroundSelect");
   if (backgroundSelect) {
     const options = Array.from(backgroundSelect.options || []);
-    const fallbackColor = options.length > 0 ? options[0].value : "#ffffff";
-    const selectableColor = options.some((option) => option.value === pageBackground)
-      ? pageBackground
-      : fallbackColor;
+    const optionValues = options
+      .map((option) => (typeof option.value === "string" ? option.value.trim().toLowerCase() : ""))
+      .filter(Boolean);
+    const fallbackColor = optionValues.length > 0 ? resolveBookmarkBackgroundColor(optionValues[0]) : "#ffffff";
+    const selectableColor = optionValues.includes(pageBackground) ? pageBackground : fallbackColor;
 
     if (backgroundSelect.value !== selectableColor) {
       backgroundSelect.value = selectableColor;
@@ -516,13 +536,14 @@ function exportBookmarkToPDF() {
   }
 
   const printableRoot = pagesContainer.cloneNode(true);
-  const backgroundColor = appState.bookmark?.backgroundColor || "#ffffff";
+  const backgroundColor = resolveBookmarkBackgroundColor(appState.bookmark?.backgroundColor);
   printableRoot.querySelectorAll(".bookmark-page").forEach((page) => {
     page.style.setProperty("--bookmark-page-bg", backgroundColor);
     page.style.backgroundColor = backgroundColor;
   });
   const title = (appState.bookmark?.title || "").trim() || "Trip Bookmark";
   const sanitizedTitle = escapeHtml(title);
+  const sanitizedBackground = escapeHtml(backgroundColor);
 
   const printWindow = window.open("", "bookmark-print");
   if (!printWindow) {
@@ -535,7 +556,8 @@ function exportBookmarkToPDF() {
   const styles = [
     '* { box-sizing: border-box; }',
     'html, body { margin: 0; padding: 0; }',
-    'body { background: #ffffff; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #2c3e50; }',
+    `html { --bookmark-page-bg: ${sanitizedBackground}; }`,
+    `body { background: ${sanitizedBackground}; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #2c3e50; -webkit-print-color-adjust: exact; print-color-adjust: exact; }`,
     '.bookmark-pages { display: flex; flex-direction: column; gap: 16px; padding: 12mm 0; align-items: center; }',
     '.bookmark-page { width: 210mm; min-height: calc(297mm - 30mm); background: var(--bookmark-page-bg, #ffffff); border: 1px solid #e5e7eb; border-radius: 12px; padding: 15mm 18mm; display: flex; flex-direction: column; gap: 24px; box-shadow: none; page-break-after: always; }',
     '.bookmark-page:last-child { page-break-after: auto; }',
@@ -563,16 +585,26 @@ function exportBookmarkToPDF() {
     '.bookmark-item-photo img { width: 100%; height: 160px; object-fit: cover; display: block; }',
     '.bookmark-empty { border: 2px dashed #d1d9e6; border-radius: 8px; padding: 40px 20px; text-align: center; color: #95a5a6; font-size: 16px; }',
     '@media print { body { margin: 0; } }',
+    '@media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }',
     '@page { size: A4; margin: 0; }'
   ].join('');
 
   const doc = printWindow.document;
   doc.open();
-  doc.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>' + sanitizedTitle + '</title><style>' + styles + '</style></head><body>');
-  doc.write('<div class="bookmark-pages">' + printableRoot.innerHTML + '</div>');
+  doc.write('<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>' + sanitizedTitle + '</title><style>' + styles + '</style></head><body style="--bookmark-page-bg: ' + sanitizedBackground + '; background-color: ' + sanitizedBackground + ';">');
+  doc.write('<div class="bookmark-pages" style="--bookmark-page-bg: ' + sanitizedBackground + '; background-color: ' + sanitizedBackground + ';">' + printableRoot.innerHTML + '</div>');
   doc.write('<script>window.addEventListener("load", function(){ window.focus(); window.print(); }); window.addEventListener("afterprint", function(){ window.close(); });</script>');
   doc.write('</body></html>');
   doc.close();
+
+  try {
+    printWindow.document.documentElement.style.setProperty("--bookmark-page-bg", backgroundColor);
+    if (printWindow.document.body) {
+      printWindow.document.body.style.backgroundColor = backgroundColor;
+    }
+  } catch (error) {
+    console.warn('Failed to apply print background color:', error);
+  }
 
   printWindow.document.title = ' ';
   if (printWindow.history && typeof printWindow.history.replaceState === "function") {
@@ -1049,17 +1081,22 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     const options = Array.from(bookmarkBackgroundSelect.options || []);
-    const fallbackColor = options.length > 0 ? options[0].value : "#ffffff";
-    const stateColor = appState.bookmark.backgroundColor || fallbackColor;
-    const selectableColor = options.some((option) => option.value === stateColor)
-      ? stateColor
-      : fallbackColor;
+    const optionValues = options
+      .map((option) => (typeof option.value === "string" ? option.value.trim().toLowerCase() : ""))
+      .filter(Boolean);
+    const fallbackColor = optionValues.length > 0 ? resolveBookmarkBackgroundColor(optionValues[0]) : "#ffffff";
+    const stateColor = resolveBookmarkBackgroundColor(appState.bookmark.backgroundColor || fallbackColor);
+    const selectableColor = optionValues.includes(stateColor) ? stateColor : fallbackColor;
 
     bookmarkBackgroundSelect.value = selectableColor;
     appState.bookmark.backgroundColor = selectableColor;
 
     bookmarkBackgroundSelect.addEventListener("change", (event) => {
-      const selectedColor = event.target.value || fallbackColor;
+      const requestedColor = typeof event.target.value === "string" ? event.target.value.trim().toLowerCase() : "";
+      const selectedColor = optionValues.includes(requestedColor)
+        ? resolveBookmarkBackgroundColor(requestedColor)
+        : fallbackColor;
+      bookmarkBackgroundSelect.value = selectedColor;
       appState.bookmark.backgroundColor = selectedColor;
       if (typeof updateBookmark === "function") {
         updateBookmark();
