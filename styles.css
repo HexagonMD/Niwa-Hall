@@ -27,6 +27,8 @@ body {
   align-items: center;
   padding: 20px 0;
   transition: width 0.3s;
+  position: relative;
+  z-index: 2000;
 }
 
 .sidebar.expanded {
@@ -69,6 +71,7 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
+  z-index: 9999;
 }
 
 .nav-button:hover .tooltip {
