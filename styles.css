@@ -27,6 +27,8 @@ body {
   align-items: center;
   padding: 20px 0;
   transition: width 0.3s;
+  position: relative;
+  z-index: 2000;
 }
 
 .sidebar.expanded {
@@ -69,6 +71,7 @@ body {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
+  z-index: 9999;
 }
 
 .nav-button:hover .tooltip {
@@ -382,6 +385,20 @@ body {
   font-size: 14px;
 }
 
+.form-group input[readonly] {
+  background: #f1f3f5;
+  border-color: #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.form-group input[readonly]:hover,
+.form-group input[readonly]:focus {
+  border-color: #d1d5db;
+  box-shadow: none;
+  outline: none;
+}
+
 .photo-previews {
   display: flex;
   gap: 10px;
@@ -592,7 +609,7 @@ body {
 .bookmark-page {
   width: 210mm;
   min-height: calc(297mm - 30mm);
-  background: #ffffff;
+  background: var(--bookmark-page-bg, #ffffff);
   border-radius: 12px;
   box-shadow: 0 14px 40px rgba(44, 62, 80, 0.15);
   padding: 15mm 18mm;

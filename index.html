@@ -124,6 +124,17 @@
                                 <div class="bookmark-cover-preview" id="bookmarkCoverPreview"></div>
                                 <button type="button" class="btn btn-secondary" id="bookmarkCoverClearBtn">Clear Image</button>
                             </div>
+                            <div class="form-group">
+                                <label for="bookmarkBackgroundSelect">背景色</label>
+                                <select id="bookmarkBackgroundSelect">
+                                    <option value="#ffffff">ホワイト</option>
+                                    <option value="#f8fafc">スモークホワイト</option>
+                                    <option value="#fef3c7">クリーム</option>
+                                    <option value="#e0f2fe">ライトブルー</option>
+                                    <option value="#dcfce7">ミント</option>
+                                    <option value="#f5f3ff">ラベンダー</option>
+                                </select>
+                            </div>
                         <p class="bookmark-note">日付ごとのスポットをベースにページを構成します。</p>
                         <button type="button" class="btn btn-primary bookmark-export-btn" id="bookmarkExportBtn">PDF出力</button>
                         </div>
@@ -168,7 +179,7 @@
                 </div>
                 <div class="form-group">
                     <label>所要時間</label>
-                    <input type="text" id="itemDuration" placeholder="例: 1時間30分">
+                    <input type="text" id="itemDuration" readonly>
                 </div>
                 <div class="form-group">
                     <label>終了時間</label>
