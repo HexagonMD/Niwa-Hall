@@ -72,6 +72,12 @@ async function initMap() {
   photoInfoWindow.addListener("closeclick", () => {
     hidePhotoPreview();
   });
+  photoInfoWindow.addListener("domready", () => {
+    const closeButton = document.querySelector(".gm-ui-hover-effect");
+    if (closeButton) {
+      closeButton.style.display = "none";
+    }
+  });
 
   map.addListener("dblclick", (e) => {
     if (typeof createPinAndIdeaFromLatLng === "function") {
