@@ -73,6 +73,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (modal) {
       modal.classList.add("active");
     }
+    const daySelect = document.getElementById("itemDay");
+    if (daySelect && (typeof window.editingPinId === "undefined" || window.editingPinId === null)) {
+      daySelect.value = "1";
+    }
   }
 
   function closeModal() {
@@ -83,6 +87,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const addForm = document.getElementById("addForm");
     if (addForm) {
       addForm.reset();
+    }
+    const daySelect = document.getElementById("itemDay");
+    if (daySelect) {
+      daySelect.value = "1";
     }
     const locationInput = document.getElementById("itemLocation");
     if (locationInput) {
