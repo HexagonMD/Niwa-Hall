@@ -30,6 +30,34 @@ const BOOKMARK_BACKGROUND_COLORS = new Set([
   "#f5f3ff",
 ]);
 
+function setEditingPinId(value) {
+  editingPinId = value;
+  if (typeof window !== "undefined") {
+    window.__editingPinId = value;
+    window.editingPinId = value;
+  }
+  return editingPinId;
+}
+
+function getEditingPinId() {
+  if (typeof window !== "undefined") {
+    if (typeof window.__editingPinId !== "undefined") {
+      return window.__editingPinId;
+    }
+    if (typeof window.editingPinId !== "undefined") {
+      return window.editingPinId;
+    }
+  }
+  return editingPinId;
+}
+
+if (typeof window !== "undefined") {
+  window.__editingPinId = editingPinId;
+  window.editingPinId = editingPinId;
+  window.setEditingPinId = setEditingPinId;
+  window.getEditingPinId = getEditingPinId;
+}
+
 function resolveBookmarkBackgroundColor(candidate) {
   if (typeof candidate !== "string") {
     return "#ffffff";
@@ -737,14 +765,16 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
   const day = document.getElementById("itemDay").value;
   const photos = currentEditingPhotos; // グローバルの一時配列から取得
 
-  if (editingPinId) {
+  const currentEditingId = getEditingPinId();
+
+  if (currentEditingId) {
     // --- 編集モード ---
-    const pinIndex = appState.pins.findIndex((p) => p.id === editingPinId);
+    const pinIndex = appState.pins.findIndex((p) => p.id === currentEditingId);
     if (pinIndex > -1) {
       appState.pins[pinIndex].title = title;
     }
 
-    const ideaIndex = appState.ideas.findIndex((i) => i.id === editingPinId);
+    const ideaIndex = appState.ideas.findIndex((i) => i.id === currentEditingId);
     if (ideaIndex > -1) {
       appState.ideas[ideaIndex] = {
         ...appState.ideas[ideaIndex],
@@ -866,7 +896,7 @@ document.getElementById("itemPhotos").addEventListener("change", function (event
 });
 
 function openEditModalForPin(pinData) {
-  editingPinId = pinData.id;
+  setEditingPinId(pinData.id);
   const idea = appState.ideas.find((i) => i.id === pinData.id);
 
   // フォームの値を設定
@@ -880,7 +910,7 @@ function openEditModalForPin(pinData) {
     document.querySelector(
       `input[name="pinType"][value="${idea.type || "sightseeing"}"]`
     ).checked = true;
-    document.getElementById("itemDay").value = idea.day || "0";
+    document.getElementById("itemDay").value = idea.day || "1";
 
     // 写真データを一時配列にコピー
     currentEditingPhotos = idea.photos ? [...idea.photos] : [];
@@ -909,7 +939,7 @@ function createPinAndIdeaFromPlace(place) {
     title: place.name,
     description: "",
     type: "sightseeing", // デフォルトのタイプ
-    day: "0", // デフォルトは未定
+    day: "1", // デフォルトは1日目
   };
 
   // appStateに追加
@@ -931,6 +961,10 @@ function createPinAndIdeaFromPlace(place) {
     undefined, // endTime
     ideaData.id
   );
+
+  if (typeof openEditModalForPin === "function") {
+    openEditModalForPin(pinData);
+  }
 
   showNotification(
     `「${place.name}」をマップとアイデアに追加しました。クリックして詳細を編集できます。`,
@@ -986,7 +1020,7 @@ function createPinAndIdeaFromLatLng(latLng) {
     title: title,
     description: "",
     type: "sightseeing",
-    day: "0",
+    day: "1",
     photos: [],
   };
 
