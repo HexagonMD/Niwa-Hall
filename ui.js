@@ -32,6 +32,10 @@ function handleDrop(e) {
 }
 function handleDragEnd(e) {
   this.classList.remove("dragging");
+  this.dataset.skipClick = "true";
+  setTimeout(() => {
+    delete this.dataset.skipClick;
+  }, 50);
   draggedElement = null;
 }
 function getDragAfterElement(container, y) {
@@ -202,7 +206,22 @@ document.addEventListener("DOMContentLoaded", () => {
       card = document.createElement("div");
       card.className = "idea-card";
       card.dataset.ideaId = ideaData.id;
+      card.draggable = true;
+      card.addEventListener("dragstart", handleDragStart);
+      card.addEventListener("dragover", handleDragOver);
+      card.addEventListener("drop", handleDrop);
+      card.addEventListener("dragend", handleDragEnd);
     }
+
+    card.onclick = (event) => {
+      if (card.dataset.skipClick === "true") {
+        delete card.dataset.skipClick;
+        return;
+      }
+      if (typeof window.openEditModalForIdea === "function") {
+        window.openEditModalForIdea(ideaData.id);
+      }
+    };
 
     let timeInfoHTML = "";
     if (ideaData.startTime || ideaData.duration || ideaData.endTime) {

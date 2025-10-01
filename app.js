@@ -922,6 +922,25 @@ function openEditModalForPin(pinData) {
   openModal();
 }
 
+function openEditModalForIdea(ideaId) {
+  const idea = appState.ideas.find((i) => i.id === ideaId);
+  if (!idea) {
+    console.warn(`Idea not found for id: ${ideaId}`);
+    return;
+  }
+
+  const pin = appState.pins.find((p) => p.id === ideaId);
+  const pinData = pin
+    ? { ...pin, title: idea.title || pin.title }
+    : { id: idea.id, title: idea.title || "" };
+
+  if (typeof window.selectedPlace !== "undefined") {
+    window.selectedPlace = null;
+  }
+
+  openEditModalForPin(pinData);
+}
+
 function createPinAndIdeaFromPlace(place) {
   const newId = Date.now();
 
@@ -1045,6 +1064,7 @@ function createPinAndIdeaFromLatLng(latLng) {
   openEditModalForPin(pinData);
 }
 window.createPinAndIdeaFromLatLng = createPinAndIdeaFromLatLng;
+window.openEditModalForIdea = openEditModalForIdea;
 
 class CollaborationManager {
   constructor() {
