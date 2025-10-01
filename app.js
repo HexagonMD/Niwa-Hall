@@ -687,7 +687,13 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
       };
     }
 
-    renderAllMarkers();
+    //renderAllMarkers();
+    const activeTab = document.querySelector('.day-tab.active');
+    if (activeTab) {
+      filterPinsByDay(activeTab.textContent);
+    } else {
+      renderAllMarkers();
+    }
     const updatedIdea = appState.ideas[ideaIndex];
     renderIdeaCard(updatedIdea);
     if (typeof updateBookmark === "function") {
@@ -876,7 +882,13 @@ function deletePinAndIdea(pinData) {
   }
 
   // UIを更新
-  renderAllMarkers(); // マップを更新
+  const activeTab = document.querySelector('.day-tab.active');
+  if (activeTab) {
+    filterPinsByDay(activeTab.textContent);
+  } else {
+    renderAllMarkers();
+  }
+  //renderAllMarkers(); // マップを更新
   removeIdeaCard(pinData.id); // アイデアカードを削除
   if (typeof updateBookmark === "function") {
     updateBookmark();
@@ -945,7 +957,7 @@ class CollaborationManager {
     const data = { type: "cursor", userId: this.userId, x: x, y: y };
   }
   broadcastDataChange(changeType, data) {
-    const message = { 
+    const message = {
       type: "dataChange",
       changeType: changeType,
       data: data,
@@ -1156,10 +1168,10 @@ function filterPinsByDay(day) {
       console.log(`Target day number: ${targetDay}`);
       ideasToShow = appState.ideas.filter((idea) => idea.day === targetDay);
     } else {
-    console.log("Fallback: No day number found, showing nothing.");
-    ideasToShow = [];
+      console.log("Fallback: No day number found, showing nothing.");
+      ideasToShow = [];
+    }
   }
-}
 
   console.log("ideasToShow:", JSON.parse(JSON.stringify(ideasToShow)));
 
