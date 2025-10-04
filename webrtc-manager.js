@@ -589,20 +589,14 @@ class WebRTCManager {
   }
 
   handleWebRTCMessage(message, fromUserId) {
-    console.log("📨 WebRTCメッセージ受信:", message.type, message.data);
+    console.log("📨 WebRTCメッセージ受信:", message.type);
 
     switch (message.type) {
       case "cursor":
         this.updateRemoteCursor(fromUserId, message.data);
         break;
-      case "idea":
-        this.emit("ideaReceived", message.data);
-        break;
-      case "marker":
-        this.emit("markerReceived", message.data);
-        break;
-      case "timeline":
-        this.emit("timelineReceived", message.data);
+      case "appStateUpdate":
+        this.emit("appStateReceived", message.data);
         break;
     }
   }
@@ -654,34 +648,11 @@ class WebRTCManager {
     });
   }
 
-  sendIdea(ideaData) {
-    console.log("📨 WebRTCManager.sendIdea呼び出し:", ideaData);
-    console.log("📊 現在の接続状況:", {
-      dataChannels: this.dataChannels.size,
-      peers: this.peerConnections.size,
-      roomId: this.roomId,
-    });
-
-    const message = {
-      type: "idea",
-      data: ideaData,
-    };
-
-    console.log("📡 ブロードキャスト実行中...");
-    this.broadcastToAll(message);
-  }
-
-  sendMarker(markerData) {
+  sendAppState(stateObject) {
+    console.log("📨 WebRTCManager.sendAppState呼び出し");
     this.broadcastToAll({
-      type: "marker",
-      data: markerData,
-    });
-  }
-
-  sendTimeline(timelineData) {
-    this.broadcastToAll({
-      type: "timeline",
-      data: timelineData,
+      type: "appStateUpdate",
+      data: stateObject,
     });
   }
 

@@ -67,6 +67,62 @@ function resolveBookmarkBackgroundColor(candidate) {
   return BOOKMARK_BACKGROUND_COLORS.has(trimmed) ? trimmed : "#ffffff";
 }
 
+// --- State Management and Synchronization ---
+
+/**
+ * Renders the entire UI based on the current appState.
+ */
+function renderUIFromState() {
+  console.log("🔄 Rendering UI from state...");
+  renderDayTabs();
+  updateDayOptions();
+
+  const ideaBoard = document.getElementById("ideaBoard");
+  if (ideaBoard) {
+    ideaBoard.innerHTML = "";
+    appState.ideas.forEach(idea => {
+      if (typeof window.renderIdeaCard === "function") {
+        window.renderIdeaCard(idea);
+      }
+    });
+  }
+
+  if (typeof window.renderAllMarkers === "function") {
+    renderAllMarkers(appState.pins);
+  }
+  if (typeof window.updateFlowchart === "function") {
+    updateFlowchart();
+  }
+  if (typeof window.updateBookmark === "function") {
+    updateBookmark();
+  }
+  if (typeof window.updateIdeaBoardEmptyState === "function") {
+    updateIdeaBoardEmptyState();
+  }
+  console.log("✅ UI Rendering complete.");
+}
+
+/**
+ * Updates the appState and triggers UI rendering and synchronization.
+ * @param {function | object} updater - A function that receives the current state and returns the new state, or a new state object.
+ * @param {boolean} [fromRemote=false] - Flag to indicate if the update is from a remote client.
+ */
+function updateStateAndSync(updater, fromRemote = false) {
+  console.log(`🔄 Updating state. Remote: ${fromRemote}`);
+  const oldState = appState;
+  const newState = typeof updater === 'function' ? updater(oldState) : updater;
+
+  appState = newState;
+
+  renderUIFromState();
+
+  if (!fromRemote && collaborationEnabled && window.webRTCManager) {
+    console.log("📤 Broadcasting new app state...");
+    window.webRTCManager.sendAppState(appState);
+  }
+}
+
+
 // WebRTC Manager初期化
 async function initWebRTC() {
   try {
@@ -89,77 +145,12 @@ async function initWebRTC() {
     console.log("✅ WebRTC初期化完了");
     showNotification("協働機能が利用可能になりました", "success");
 
-    // WebRTCイベントリスナー
-    window.webRTCManager.on("ideaReceived", (data) => {
-      console.log("🎉 アイデア受信イベント発火:", data);
-      console.log("📥 受信したデータ:", JSON.stringify(data, null, 2));
-      addIdeaCard(
-        data.title,
-        data.description,
-        data.type,
-        data.day,
-        true,
-        data.startTime,
-        data.duration,
-        data.endTime,
-        data.id
-      );
-      console.log("✅ 受信アイデアを画面に追加完了");
-    });
+    // --- WebRTCイベントリスナー ---
 
-    window.webRTCManager.on("markerReceived", (data) => {
-      console.log("📍 マーカー受信:", data);
-
-      // マーカーを追加
-      addMarker(data, true, true);
-
-      const fallbackIdea = {
-        id: data.id,
-        title: data.title || data.name || "共有されたスポット",
-        description: data.address || `座標: ${data.lat}, ${data.lng}`,
-        type: "sightseeing",
-        day: "0",
-      };
-
-      const existingIdea = appState.ideas.find((idea) => idea.id === data.id);
-      const isNewIdea = !existingIdea;
-
-      if (existingIdea) {
-        const mergedIdea = {
-          ...existingIdea,
-          title: fallbackIdea.title || existingIdea.title,
-          description: existingIdea.description || fallbackIdea.description,
-        };
-
-        addIdeaCard(
-          mergedIdea.title,
-          mergedIdea.description,
-          mergedIdea.type,
-          mergedIdea.day,
-          true,
-          mergedIdea.startTime,
-          mergedIdea.duration,
-          mergedIdea.endTime,
-          mergedIdea.id,
-          mergedIdea.photos || []
-        );
-      } else {
-        addIdeaCard(
-          fallbackIdea.title,
-          fallbackIdea.description,
-          fallbackIdea.type,
-          fallbackIdea.day,
-          true,
-          undefined,
-          undefined,
-          undefined,
-          fallbackIdea.id
-        );
-      }
-
-      if (isNewIdea) {
-        showNotification("新しいスポットが共有されました", "success");
-      }
+    // 他のクライアントから新しいappStateを受信
+    window.webRTCManager.on("appStateReceived", (newState) => {
+      console.log("📥 New app state received from remote");
+      updateStateAndSync(newState, true); // fromRemote = true
     });
 
     window.webRTCManager.on("userJoined", (user) => {
@@ -175,7 +166,10 @@ async function initWebRTC() {
     window.webRTCManager.on("roomJoined", (roomId) => {
       collaborationEnabled = true;
       window.collaborationEnabled = true;
-      appState.roomId = roomId;
+      
+      // Update state without broadcasting
+      updateStateAndSync(currentState => ({ ...currentState, roomId }), true);
+
       console.log("🎯 ルーム参加完了、協働機能有効化:", { roomId, collaborationEnabled });
       updateUserList();
       showNotification("協働機能が有効になりました！", "success");
@@ -184,7 +178,10 @@ async function initWebRTC() {
     window.webRTCManager.on("roomLeft", () => {
       collaborationEnabled = false;
       window.collaborationEnabled = false;
-      appState.roomId = null;
+      
+      // Update state without broadcasting
+      updateStateAndSync(currentState => ({ ...currentState, roomId: null }), true);
+
       updateUserList();
     });
   }
@@ -229,59 +226,11 @@ function startCollaboration() {
 function leaveCollaboration() {
   if (window.webRTCManager && appState.roomId) {
     window.webRTCManager.leaveRoom();
-    appState.roomId = null;
-    collaborationEnabled = false;
-    window.collaborationEnabled = false;
+    // The roomLeft event will handle state updates
     showNotification("協働セッションから退出しました", "info");
   }
 }
 
-// 旅行データ同期関数（新規ユーザー入室時の既存データ表示用）
-function syncTripData(tripData) {
-  console.log("🔄 tripData同期開始:", tripData);
-
-  if (!tripData) {
-    console.warn("⚠️ tripDataが空です");
-    return;
-  }
-
-  // 既存のアイデアを表示
-  if (tripData.ideas && Array.isArray(tripData.ideas)) {
-    console.log(`📝 ${tripData.ideas.length}個のアイデアを同期中...`);
-
-    tripData.ideas.forEach((idea, index) => {
-      console.log(`📝 アイデア${index + 1}を表示:`, idea);
-      // fromRemote = true で追加（WebRTC送信をスキップ）
-      addIdeaCard(
-        idea.title,
-        idea.description,
-        idea.type,
-        idea.day,
-        true,
-        idea.startTime,
-        idea.duration,
-        idea.endTime,
-        idea.id
-      );
-    });
-
-    console.log("✅ 全てのアイデア同期完了");
-  }
-
-  // 必要に応じて他のデータも同期（ピン、タイムラインなど）
-  if (tripData.pins) {
-    console.log(`📍 ${tripData.pins.length}個のピンを同期中...`);
-    // ピン同期処理は将来実装
-  }
-
-  if (tripData.timeline) {
-    console.log("📅 タイムラインを同期中...");
-    // タイムライン同期処理は将来実装
-  }
-}
-
-// グローバルからアクセス可能にする
-window.syncTripData = syncTripData;
 
 // アイデアカードの追加（WebRTC対応版）
 
@@ -650,106 +599,7 @@ function exportBookmarkToPDF() {
 
 window.exportBookmarkToPDF = exportBookmarkToPDF;
 
-function addIdeaCard(
-  title,
-  description,
-  type,
-  day,
-  fromRemote = false,
-  startTime,
-  duration,
-  endTime,
-  existingId,
-  photos = []
-) {
-  console.log("🎯 addIdeaCard呼び出し:", {
-    title,
-    description,
-    type,
-    day,
-    fromRemote,
-    startTime,
-    duration,
-    endTime,
-    existingId,
-    photos,
-  });
 
-  const ideaData = {
-    title,
-    description,
-    type,
-    day,
-    id: existingId || Date.now(),
-    startTime,
-    duration,
-    endTime,
-    photos,
-  };
-  const existingIndex = appState.ideas.findIndex((idea) => idea.id === ideaData.id);
-  if (existingIndex >= 0) {
-    appState.ideas[existingIndex] = ideaData;
-  } else {
-    appState.ideas.push(ideaData);
-  }
-
-  const card = typeof window.renderIdeaCard === "function" ? window.renderIdeaCard(ideaData) : null;
-  if (!card) {
-    console.warn("⚠️ アイデアカードの描画に失敗しました");
-  }
-
-  // WebRTC同期の詳細チェック
-  console.log("🔍 WebRTC同期チェック開始");
-  console.log("- fromRemote:", fromRemote);
-  console.log("- collaborationEnabled:", collaborationEnabled);
-  console.log("- window.webRTCManager:", !!window.webRTCManager);
-
-  if (!fromRemote && collaborationEnabled && window.webRTCManager) {
-    const notification = showNotification("アイデアを保存中...", "info", 10000);
-    console.log("📤 WebRTC送信開始:", ideaData);
-    console.log("WebRTCManager詳細状態:", {
-      initialized: window.webRTCManager.isInitialized,
-      connected: window.webRTCManager.isConnected,
-      roomId: window.webRTCManager.roomId,
-      dataChannels: window.webRTCManager.dataChannels?.size,
-      sendIdeaExists: typeof window.webRTCManager.sendIdea === "function",
-    });
-
-    try {
-      window.webRTCManager.sendIdea(ideaData);
-      console.log("✅ WebRTC送信完了");
-      notification.textContent = "同期完了！";
-      notification.className = "notification success";
-      setTimeout(() => {
-        notification.style.opacity = "0";
-        setTimeout(() => {
-          if (document.body.contains(notification)) {
-            document.body.removeChild(notification);
-          }
-        }, 300);
-      }, 1500);
-    } catch (error) {
-      console.error("❌ WebRTC送信エラー:", error);
-      notification.textContent = "同期失敗...";
-      notification.className = "notification error";
-    }
-  } else {
-    console.log("❌ WebRTC送信スキップ理由:", {
-      fromRemote: fromRemote,
-      collaborationEnabled: collaborationEnabled,
-      webRTCManagerExists: !!window.webRTCManager,
-      condition: `!${fromRemote} && ${collaborationEnabled} && ${!!window.webRTCManager}`,
-    });
-  }
-
-  // フローチャートを更新
-  if (typeof updateFlowchart === "function") {
-    updateFlowchart();
-  }
-  if (typeof updateBookmark === "function") {
-    updateBookmark();
-  }
-}
 
 // フォーム送信処理
 document.getElementById("addForm").addEventListener("submit", function (e) {
@@ -769,82 +619,39 @@ document.getElementById("addForm").addEventListener("submit", function (e) {
 
   if (currentEditingId) {
     // --- 編集モード ---
-    const pinIndex = appState.pins.findIndex((p) => p.id === currentEditingId);
-    if (pinIndex > -1) {
-      appState.pins[pinIndex].title = title;
-    }
-
-    const ideaIndex = appState.ideas.findIndex((i) => i.id === currentEditingId);
-    if (ideaIndex > -1) {
-      appState.ideas[ideaIndex] = {
-        ...appState.ideas[ideaIndex],
-        title,
-        description,
-        type: pinType,
-        day,
-        startTime,
-        duration,
-        endTime,
-        photos, // 更新された写真リスト
-      };
-    }
-
-    //renderAllMarkers();
-    const activeTab = document.querySelector('.day-tab.active');
-    if (activeTab) {
-      filterPinsByDay(activeTab.textContent);
-    } else {
-      renderAllMarkers();
-    }
-    const updatedIdea = appState.ideas[ideaIndex];
-    renderIdeaCard(updatedIdea);
-    if (typeof updateBookmark === "function") {
-      updateBookmark();
-    }
-
-    if (collaborationEnabled && window.webRTCManager) {
-      if (updatedIdea) {
-        window.webRTCManager.sendIdea(updatedIdea);
+    updateStateAndSync(currentState => {
+      const newState = JSON.parse(JSON.stringify(currentState));
+      
+      const pinIndex = newState.pins.findIndex((p) => p.id === currentEditingId);
+      if (pinIndex > -1) {
+        newState.pins[pinIndex].title = title;
       }
-      if (pinIndex > -1 && appState.pins[pinIndex]) {
-        window.webRTCManager.sendMarker(appState.pins[pinIndex]);
+
+      const ideaIndex = newState.ideas.findIndex((i) => i.id === currentEditingId);
+      if (ideaIndex > -1) {
+        newState.ideas[ideaIndex] = {
+          ...newState.ideas[ideaIndex],
+          title,
+          description,
+          url,
+          type: pinType,
+          day,
+          startTime,
+          duration,
+          endTime,
+          photos,
+        };
       }
-    }
+      return newState;
+    });
 
     showNotification(`「${title}」を更新しました`, "success");
   } else {
-    // This block might be deprecated now, but we'll leave it for now.
-    const newId = Date.now();
-    addIdeaCard(
-      title,
-      description,
-      pinType,
-      day,
-      false,
-      startTime,
-      duration,
-      endTime,
-      newId,
-      photos
-    );
-
-    if (clickedLatLng) {
-      const data = { id: newId, title: title, lat: clickedLatLng.lat, lng: clickedLatLng.lng };
-      addMarker(data, true);
-      clickedLatLng = null;
-    } else if (selectedPlace && selectedPlace.geometry) {
-      const data = {
-        id: newId,
-        title: selectedPlace.name,
-        lat: selectedPlace.geometry.location.lat(),
-        lng: selectedPlace.geometry.location.lng(),
-      };
-      addMarker(data, true);
-    }
-    showNotification(`「${title}」を追加しました`, "success");
+    // This block is for creating a new item, but it's triggered from other functions
+    // that should be refactored. For now, we leave a warning.
+    console.warn("Form submitted without an editing ID. This flow may be deprecated.");
   }
 
-  updateFlowchart();
   closeModal();
 });
 
@@ -973,45 +780,37 @@ function openEditModalForIdea(ideaId) {
 function createPinAndIdeaFromPlace(place) {
   const newId = Date.now();
 
-  // Pinデータを作成
-  const pinData = {
-    id: newId,
-    title: place.name,
-    lat: place.geometry.location.lat(),
-    lng: place.geometry.location.lng(),
-  };
+  updateStateAndSync(currentState => {
+    const newState = JSON.parse(JSON.stringify(currentState));
 
-  // 対応するIdeaデータを最小限で作成
-  const ideaData = {
-    id: newId,
-    title: place.name,
-    description: "",
-    type: "sightseeing", // デフォルトのタイプ
-    day: "1", // デフォルトは1日目
-  };
+    // Pinデータを作成
+    const pinData = {
+      id: newId,
+      title: place.name,
+      lat: place.geometry.location.lat(),
+      lng: place.geometry.location.lng(),
+    };
 
-  // appStateに追加
-  appState.pins.push(pinData);
-  appState.ideas.push(ideaData);
+    // 対応するIdeaデータを最小限で作成
+    const ideaData = {
+      id: newId,
+      title: place.name,
+      description: place.formatted_address || "",
+      type: "sightseeing", // デフォルトのタイプ
+      day: "1", // デフォルトは1日目
+      photos: (place.photos || []).map(p => p.getUrl({ maxWidth: 800, maxHeight: 800 })),
+      url: place.website || "",
+    };
 
-  // 地図にマーカーを追加（WebRTC送信も含む）
-  addMarker(pinData, true, false); // fromRemote=false でWebRTC送信を有効化
-
-  // アイデアボードにカードを追加（WebRTC送信も含む）
-  addIdeaCard(
-    ideaData.title,
-    ideaData.description,
-    ideaData.type,
-    ideaData.day,
-    false, // fromRemote=false
-    undefined, // startTime
-    undefined, // duration
-    undefined, // endTime
-    ideaData.id
-  );
+    newState.pins.push(pinData);
+    newState.ideas.push(ideaData);
+    
+    return newState;
+  });
 
   if (typeof openEditModalForPin === "function") {
-    openEditModalForPin(pinData);
+    // We need to find the pinData in the new state, but the ID is sufficient
+    openEditModalForPin({ id: newId, title: place.name });
   }
 
   showNotification(
@@ -1023,30 +822,23 @@ function createPinAndIdeaFromPlace(place) {
 window.createPinAndIdeaFromPlace = createPinAndIdeaFromPlace;
 
 function deletePinAndIdea(pinData) {
-  // appState.pinsから削除
-  const pinIndex = appState.pins.findIndex((p) => p.id === pinData.id);
-  if (pinIndex > -1) {
-    appState.pins.splice(pinIndex, 1);
-  }
+  updateStateAndSync(currentState => {
+    const newState = JSON.parse(JSON.stringify(currentState));
+    
+    // appState.pinsから削除
+    const pinIndex = newState.pins.findIndex((p) => p.id === pinData.id);
+    if (pinIndex > -1) {
+      newState.pins.splice(pinIndex, 1);
+    }
 
-  // appState.ideasから削除
-  const ideaIndex = appState.ideas.findIndex((i) => i.id === pinData.id);
-  if (ideaIndex > -1) {
-    appState.ideas.splice(ideaIndex, 1);
-  }
+    // appState.ideasから削除
+    const ideaIndex = newState.ideas.findIndex((i) => i.id === pinData.id);
+    if (ideaIndex > -1) {
+      newState.ideas.splice(ideaIndex, 1);
+    }
 
-  // UIを更新
-  const activeTab = document.querySelector('.day-tab.active');
-  if (activeTab) {
-    filterPinsByDay(activeTab.textContent);
-  } else {
-    renderAllMarkers();
-  }
-  //renderAllMarkers(); // マップを更新
-  removeIdeaCard(pinData.id); // アイデアカードを削除
-  if (typeof updateBookmark === "function") {
-    updateBookmark();
-  }
+    return newState;
+  });
 
   showNotification(`「${pinData.title}」を削除しました`, "success");
 }
@@ -1072,22 +864,12 @@ function createPinAndIdeaFromLatLng(latLng) {
     photos: [],
   };
 
-  appState.pins.push(pinData);
-  appState.ideas.push(ideaData);
-
-  addMarker(pinData, false, false); // fromRemote=false でWebRTC送信を有効化
-  addIdeaCard(
-    ideaData.title,
-    ideaData.description,
-    ideaData.type,
-    ideaData.day,
-    false, // fromRemote=false
-    undefined, // startTime
-    undefined, // duration
-    undefined, // endTime
-    ideaData.id,
-    ideaData.photos
-  );
+  updateStateAndSync(currentState => {
+    const newState = JSON.parse(JSON.stringify(currentState));
+    newState.pins.push(pinData);
+    newState.ideas.push(ideaData);
+    return newState;
+  });
 
   // すぐに編集モーダルを開く
   openEditModalForPin(pinData);
@@ -1204,26 +986,29 @@ document.addEventListener("DOMContentLoaded", function () {
     if (target.classList.contains("delete-day-btn")) {
       event.stopPropagation(); // タブ自体のクリックイベントを発火させない
       const dayIdToDelete = parseInt(target.dataset.dayId, 10);
-      if (confirm(`${appState.days.find(d => d.id === dayIdToDelete)?.name}を削除しますか？`)) {
-        // 該当する日のアイデアを「未定」に移動
-        appState.ideas.forEach(idea => {
-          if (idea.day == dayIdToDelete) {
-            idea.day = "0";
-          }
+      const dayName = appState.days.find(d => d.id === dayIdToDelete)?.name || "この日";
+      if (confirm(`${dayName}を削除しますか？ 関連する予定は「未定」に移動します。`)) {
+        
+        updateStateAndSync(currentState => {
+          const newState = JSON.parse(JSON.stringify(currentState));
+          // 該当する日のアイデアを「未定」に移動
+          newState.ideas.forEach(idea => {
+            if (idea.day == dayIdToDelete) {
+              idea.day = "0";
+            }
+          });
+          // appState.daysから削除
+          newState.days = newState.days.filter(day => day.id !== dayIdToDelete);
+          return newState;
         });
 
-        // appState.daysから削除
-        appState.days = appState.days.filter(day => day.id !== dayIdToDelete);
-
         // UIを更新
-        renderDayTabs();
-        updateDayOptions();
         filterPinsByDay("未定"); // 未定タブをアクティブにする
         document.querySelector(".day-tab.static[data-day-id=\"0\"]")?.classList.add("active");
 
         showNotification("日程を削除しました", "success");
       }
-      return; // これ以降のタブクリック処理を中断
+      return;
     }
 
     // 日程タブのクリック
@@ -1237,13 +1022,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // 日程追加ボタンのクリック
     if (target.id === "addDayBtn") {
-      const nextDayNum = appState.days.length > 0 ? Math.max(...appState.days.map(d => d.id)) + 1 : 1;
-      const newDay = { id: nextDayNum, name: `${nextDayNum}日目` };
-      appState.days.push(newDay);
-      
-      renderDayTabs();
-      updateDayOptions();
-      showNotification(`「${newDay.name}」を追加しました`, "success");
+      updateStateAndSync(currentState => {
+        const newState = JSON.parse(JSON.stringify(currentState));
+        const nextDayNum = newState.days.length > 0 ? Math.max(...newState.days.map(d => d.id)) + 1 : 1;
+        const newDay = { id: nextDayNum, name: `${nextDayNum}日目` };
+        newState.days.push(newDay);
+        return newState;
+      });
+      // The UI will be updated by renderUIFromState, so no need to call showNotification here
+      // as the visual change is the notification.
     }
   });
 
@@ -1256,58 +1043,45 @@ document.addEventListener("DOMContentLoaded", function () {
   const bookmarkExportBtn = document.getElementById("bookmarkExportBtn");
   const bookmarkBackgroundSelect = document.getElementById("bookmarkBackgroundSelect");
 
-  if (bookmarkTitleInput && appState.bookmark) {
-    bookmarkTitleInput.value = appState.bookmark.title;
+  if (bookmarkTitleInput) {
     bookmarkTitleInput.addEventListener("input", (event) => {
-      appState.bookmark.title = event.target.value;
-      if (typeof updateBookmark === "function") {
-        updateBookmark();
-      }
+      const newTitle = event.target.value;
+      updateStateAndSync(currentState => {
+        const newState = JSON.parse(JSON.stringify(currentState));
+        if (!newState.bookmark) newState.bookmark = {};
+        newState.bookmark.title = newTitle;
+        return newState;
+      });
     });
   }
 
   if (bookmarkBackgroundSelect) {
-    if (!appState.bookmark) {
-      appState.bookmark = { title: "", coverImage: null, backgroundColor: "#ffffff" };
-    }
-
-    const options = Array.from(bookmarkBackgroundSelect.options || []);
-    const optionValues = options
-      .map((option) => (typeof option.value === "string" ? option.value.trim().toLowerCase() : ""))
-      .filter(Boolean);
-    const fallbackColor = optionValues.length > 0 ? resolveBookmarkBackgroundColor(optionValues[0]) : "#ffffff";
-    const stateColor = resolveBookmarkBackgroundColor(appState.bookmark.backgroundColor || fallbackColor);
-    const selectableColor = optionValues.includes(stateColor) ? stateColor : fallbackColor;
-
-    bookmarkBackgroundSelect.value = selectableColor;
-    appState.bookmark.backgroundColor = selectableColor;
-
     bookmarkBackgroundSelect.addEventListener("change", (event) => {
-      const requestedColor = typeof event.target.value === "string" ? event.target.value.trim().toLowerCase() : "";
-      const selectedColor = optionValues.includes(requestedColor)
-        ? resolveBookmarkBackgroundColor(requestedColor)
-        : fallbackColor;
-      bookmarkBackgroundSelect.value = selectedColor;
-      appState.bookmark.backgroundColor = selectedColor;
-      if (typeof updateBookmark === "function") {
-        updateBookmark();
-      }
+      const newColor = event.target.value;
+      updateStateAndSync(currentState => {
+        const newState = JSON.parse(JSON.stringify(currentState));
+        if (!newState.bookmark) newState.bookmark = {};
+        newState.bookmark.backgroundColor = newColor;
+        return newState;
+      });
     });
   }
 
   if (bookmarkCoverInput) {
     bookmarkCoverInput.addEventListener("change", (event) => {
-      const fileList = event.target.files;
-      const file = fileList && fileList[0];
-      if (!file) {
-        return;
-      }
+      const file = event.target.files?.[0];
+      if (!file) return;
+      
       const reader = new FileReader();
       reader.onload = (loadEvent) => {
-        const result = loadEvent && loadEvent.target ? loadEvent.target.result : null;
-        appState.bookmark.coverImage = result;
-        if (typeof updateBookmark === "function") {
-          updateBookmark();
+        const newCoverImage = loadEvent.target?.result;
+        if (newCoverImage) {
+          updateStateAndSync(currentState => {
+            const newState = JSON.parse(JSON.stringify(currentState));
+            if (!newState.bookmark) newState.bookmark = {};
+            newState.bookmark.coverImage = newCoverImage;
+            return newState;
+          });
         }
       };
       reader.readAsDataURL(file);
@@ -1319,12 +1093,13 @@ document.addEventListener("DOMContentLoaded", function () {
       if (bookmarkCoverInput) {
         bookmarkCoverInput.value = "";
       }
-      if (appState.bookmark) {
-        appState.bookmark.coverImage = null;
-      }
-      if (typeof updateBookmark === "function") {
-        updateBookmark();
-      }
+      updateStateAndSync(currentState => {
+        const newState = JSON.parse(JSON.stringify(currentState));
+        if (newState.bookmark) {
+          newState.bookmark.coverImage = null;
+        }
+        return newState;
+      });
     });
   }
 
