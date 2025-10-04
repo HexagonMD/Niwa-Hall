@@ -560,12 +560,14 @@ body {
 
 .bookmark-content {
   display: flex;
+  flex-direction: row; /* 横並びに */
   gap: 24px;
   height: 100%;
 }
 
 .bookmark-controls {
   width: 260px;
+  flex-shrink: 0; /* 縮まないようにする */
   background: #ffffff;
   border-radius: 12px;
   padding: 20px;
@@ -573,54 +575,23 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto; /* コンテンツがはみ出たらスクロール */
 }
 
-.bookmark-controls h2 {
-  font-size: 18px;
-  color: #2c3e50;
-  margin-bottom: 4px;
-}
-
-.bookmark-note {
-  font-size: 13px;
-  color: #7f8c8d;
-  line-height: 1.5;
-}
-
-.bookmark-cover-preview {
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  border: 1px dashed #cfd6e0;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: #f8fafc;
-}
-
-.bookmark-cover-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.bookmark-cover-preview .bookmark-cover-placeholder {
-  color: #95a5a6;
-  font-size: 13px;
-  text-align: center;
-  padding: 8px;
+.bookmark-controls .form-group {
+  flex: unset;
+  min-width: unset;
 }
 
 .bookmark-preview {
   flex: 1;
+  min-width: 0; /* flexアイテムが縮小できるようにする */
   display: flex;
   flex-direction: column;
   align-items: center;
   overflow-y: auto;
   padding-right: 10px;
 }
-
 .bookmark-pages {
   display: flex;
   flex-direction: column;
@@ -860,33 +831,33 @@ body {
 
 /* 日程削除ボタン */
 .delete-day-btn {
-    position: absolute;
-    top: 50%;
-    right: 8px;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: rgba(0,0,0,0.15);
-    color: #495057;
-    border: none;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    line-height: 1;
-    opacity: 0;
-    transition: opacity 0.2s, background 0.2s;
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  color: #495057;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
 }
 
 .day-tab:hover .delete-day-btn {
-    opacity: 1;
+  opacity: 1;
 }
 
 .delete-day-btn:hover {
-    background: rgba(0,0,0,0.3);
-    color: #000;
+  background: rgba(0, 0, 0, 0.3);
+  color: #000;
 }
 
 /* --- フローチャート横並び表示用スタイル --- */
