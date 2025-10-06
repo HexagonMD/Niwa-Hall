@@ -3,7 +3,7 @@
 このプロジェクトは、2025年10月5日に開催された **HACK U 東京電機大学** にて発表しました。  
 発表スライドはこちらから閲覧できます：
 
-[プレゼン資料.pdf を開く](https://github.com/HexagonMD/Niwa-Hall/blob/main/とりっぴープレゼン資料.pdf)
+[プレゼン資料.pdf を開く]([https://github.com/HexagonMD/Niwa-Hall/blob/main/とりっぴープレゼン資料.pdf](https://github.com/HexagonMD/Niwa-Hall/blob/master/%E3%81%A8%E3%82%8A%E3%81%A3%E3%81%B4%E3%83%BC%E3%83%97%E3%83%AC%E3%82%BC%E3%83%B3%E8%B3%87%E6%96%99.pdf))
 
 ## サーバ構築手順
 
