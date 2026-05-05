@@ -164,12 +164,14 @@ io.on("connection", (socket) => {
   socket.on("trip-data-update", (data) => {
     if (currentRoom) {
       const room = rooms.get(currentRoom);
-      room.updateTripData(data);
+      if (room) {
+        room.updateTripData(data);
 
-      socket.to(currentRoom).emit("trip-data-update", {
-        fromUserId: currentUserId,
-        data,
-      });
+        socket.to(currentRoom).emit("trip-data-update", {
+          fromUserId: currentUserId,
+          data,
+        });
+      }
     }
   });
 
